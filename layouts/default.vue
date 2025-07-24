@@ -1,11 +1,21 @@
 <template>
-  <div class="wrapper flex flex-col min-h-screen">
-    <div class="content flex-grow">
-      <slot name="header" />
-      <slot name="main"> </slot>
-    </div>
-    <div class="footer mt-auto">
-      <slot name="footer" />
-    </div>
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <!-- Header -->
+    <Header />
+    
+    <!-- Main Content -->
+    <main class="min-h-screen">
+      <slot />
+    </main>
+    
+    <!-- Toast Notifications -->
+    <Toast />
+    
+    <!-- Footer -->
+    <Footer />
   </div>
 </template>
+
+<script setup>
+// Import any global utilities or stores if needed
+</script>

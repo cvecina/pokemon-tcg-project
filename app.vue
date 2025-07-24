@@ -6,11 +6,6 @@ moment.locale("es");
 
 <template>
   <NuxtLayout>
-    <template #header><Header></Header></template>
-    <template #main>
-      <Toast />
-      <NuxtPage />
-    </template>
-    <template #footer><Footer></Footer></template>
+    <NuxtPage />
   </NuxtLayout>
 </template>
