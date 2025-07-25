@@ -107,39 +107,48 @@
             />
             <button
               @click="searchPokemon"
-              :disabled="!searchTerm.trim()"
+              :disabled="!searchTerm.trim() || loading"
               class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              🔍 Buscar
+              <span v-if="loading">⏳</span>
+              <span v-else>🔍</span>
+              Buscar
             </button>
           </div>
 
           <!-- Generación aleatoria -->
           <button
             @click="getRandomPokemon"
-            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            :disabled="loading"
+            class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            🎲 Pokémon Aleatorio
+            <span v-if="loading">⏳</span>
+            <span v-else>🎲</span>
+            Pokémon Aleatorio
           </button>
 
           <!-- Navegación -->
           <div class="flex gap-2 items-center">
             <button
               @click="previousPokemon"
-              :disabled="currentId <= 1"
+              :disabled="currentId <= 1 || loading"
               class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ⬅️ Anterior
+              <span v-if="loading">⏳</span>
+              <span v-else>⬅️</span>
+              Anterior
             </button>
             <span class="text-lg font-bold text-yellow-300"
               >#{{ currentId }}</span
             >
             <button
               @click="nextPokemon"
-              :disabled="currentId >= 1010"
+              :disabled="currentId >= 1025 || loading"
               class="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ➡️ Siguiente
+              <span v-if="loading">⏳</span>
+              <span v-else>➡️</span>
+              Siguiente
             </button>
           </div>
         </div>
@@ -374,9 +383,9 @@
                     </span>
                   </div>
                   
-                  <!-- Loading para movimientos que aún se están cargando -->
+                  <!-- Mostrar solo el nombre si no hay datos disponibles -->
                   <div v-else class="text-xs text-white/60">
-                    Cargando tipo...
+                    <span class="text-xs opacity-75">🔄 Datos básicos</span>
                   </div>
                 </div>
               </div>
@@ -392,7 +401,6 @@
                 <span v-if="loadingMoves">⏳</span>
                 <span v-else>{{ showAllMoves ? '🔽' : '▶️' }}</span>
                 <span>{{ showAllMoves ? 'Ocultar' : 'Ver' }} Todos los Movimientos ({{ pokemon.moves.length }})</span>
-                <span v-if="loadingMoves" class="text-xs">Cargando tipos...</span>
               </button>
             </div>
           </div>
@@ -533,7 +541,7 @@
               <!-- Fallback si no hay detalles -->
               <div v-else class="mt-2">
                 <span class="bg-gray-500 text-white px-2 py-1 rounded text-xs">
-                  Cargando...
+                  Tipo desconocido
                 </span>
               </div>
             </div>
@@ -884,9 +892,12 @@ onMounted(() => {
 async function loadPokemon(id) {
   loading.value = true;
   error.value = "";
-  showAllMoves.value = false; // Cerrar la lista de movimientos
-  movesDetails.value = {}; // Limpiar detalles anteriores
-  featuredMovesDetails.value = {}; // Limpiar movimientos destacados
+  
+  // Guardar estado actual por si falla la carga
+  const previousPokemon = pokemon.value;
+  const previousFeaturedMovesDetails = featuredMovesDetails.value;
+  const previousMovesDetails = movesDetails.value;
+  const previousShowAllMoves = showAllMoves.value;
 
   try {
     // Verificar si ya tenemos este Pokémon en caché
@@ -908,9 +919,15 @@ async function loadPokemon(id) {
       
       // Cargar movimientos destacados desde caché también
       featuredMovesDetails.value = await loadFeaturedMovesDetails();
+      console.log('📊 Featured moves details loaded from cache:', Object.keys(featuredMovesDetails.value).length);
       
       // Cargar automáticamente los nombres de las habilidades en español
       await loadAbilitiesDetails();
+      
+      // Limpiar detalles anteriores solo si la carga desde caché fue exitosa
+      showAllMoves.value = false;
+      movesDetails.value = {};
+      
       loading.value = false;
       return;
     }
@@ -939,14 +956,29 @@ async function loadPokemon(id) {
     
     // Cargar automáticamente los tipos de los movimientos destacados
     featuredMovesDetails.value = await loadFeaturedMovesDetails();
+    console.log('📊 Featured moves details loaded from API:', Object.keys(featuredMovesDetails.value).length);
     
     // Cargar automáticamente los nombres de las habilidades en español
     await loadAbilitiesDetails();
+    
+    // Solo cerrar movimientos y limpiar detalles si la carga fue exitosa
+    showAllMoves.value = false;
+    movesDetails.value = {};
+    
   } catch (err) {
     error.value = err.message;
     console.error("Error cargando Pokémon:", err);
+    
+    // Restaurar estado anterior si falla la carga
+    pokemon.value = previousPokemon;
+    featuredMovesDetails.value = previousFeaturedMovesDetails;
+    movesDetails.value = previousMovesDetails;
+    showAllMoves.value = previousShowAllMoves;
+    
+    console.log('🔄 Estado anterior restaurado debido a error en la carga');
   } finally {
     loading.value = false;
+    loadingMoves.value = false; // Asegurar que no quede en estado de carga
   }
 }
 
@@ -1011,6 +1043,20 @@ function isValidSearchText(text) {
 async function searchPokemon() {
   if (!searchTerm.value.trim()) return;
 
+  // Verificar si ya está cargando algo
+  if (loading.value) {
+    error.value = "Ya se está cargando un Pokémon, espera un momento...";
+    
+    // Limpiar el mensaje después de 3 segundos
+    setTimeout(() => {
+      if (error.value === "Ya se está cargando un Pokémon, espera un momento...") {
+        error.value = "";
+      }
+    }, 3000);
+    
+    return;
+  }
+
   const term = searchTerm.value.toLowerCase().trim();
   
   // Validar que solo contenga caracteres válidos
@@ -1024,23 +1070,66 @@ async function searchPokemon() {
     // No limpiar el término de búsqueda para permitir búsquedas similares
   } catch (err) {
     error.value = `Pokémon "${term}" no encontrado`;
+    // Ya no limpiamos el estado aquí porque loadPokemon() se encarga de mantener el estado anterior
   }
 }
 
 // Pokémon aleatorio
 function getRandomPokemon() {
-  const randomId = Math.floor(Math.random() * 1010) + 1;
+  // Verificar si ya está cargando algo
+  if (loading.value) {
+    error.value = "Ya se está cargando un Pokémon, espera un momento...";
+    
+    // Limpiar el mensaje después de 3 segundos
+    setTimeout(() => {
+      if (error.value === "Ya se está cargando un Pokémon, espera un momento...") {
+        error.value = "";
+      }
+    }, 3000);
+    
+    return;
+  }
+  
+  const randomId = Math.floor(Math.random() * 1025) + 1;
   loadPokemon(randomId);
 }
 
 // Navegación
 function nextPokemon() {
-  if (currentId.value < 1010) {
+  // Verificar si ya está cargando algo
+  if (loading.value) {
+    error.value = "Ya se está cargando un Pokémon, espera un momento...";
+    
+    // Limpiar el mensaje después de 3 segundos
+    setTimeout(() => {
+      if (error.value === "Ya se está cargando un Pokémon, espera un momento...") {
+        error.value = "";
+      }
+    }, 3000);
+    
+    return;
+  }
+  
+  if (currentId.value < 1025) {
     loadPokemon(currentId.value + 1);
   }
 }
 
 function previousPokemon() {
+  // Verificar si ya está cargando algo
+  if (loading.value) {
+    error.value = "Ya se está cargando un Pokémon, espera un momento...";
+    
+    // Limpiar el mensaje después de 3 segundos
+    setTimeout(() => {
+      if (error.value === "Ya se está cargando un Pokémon, espera un momento...") {
+        error.value = "";
+      }
+    }, 3000);
+    
+    return;
+  }
+  
   if (currentId.value > 1) {
     loadPokemon(currentId.value - 1);
   }
@@ -1048,7 +1137,9 @@ function previousPokemon() {
 
 // Cargar detalles de movimientos destacados (primeros 8)
 async function loadFeaturedMovesDetails() {
-  if (!pokemon.value) return;
+  if (!pokemon.value) return {};
+  
+  console.log('🎯 Iniciando carga de movimientos destacados...');
   
   const featuredMoves = pokemon.value.moves.slice(0, 8);
   const details = {};
@@ -1060,13 +1151,17 @@ async function loadFeaturedMovesDetails() {
     }
   }
   
+  console.log(`📋 Movimientos destacados: ${Object.keys(details).length} en caché de ${featuredMoves.length} total`);
+  
   // Si ya tenemos todos en caché, terminar
   if (Object.keys(details).length === featuredMoves.length) {
+    console.log('✅ Todos los movimientos destacados estaban en caché');
     return details;
   }
   
   // Cargar los que faltan en paralelo
   const missingMoves = featuredMoves.filter(move => !movesCache.value[move.move.name]);
+  console.log(`🌐 Cargando ${missingMoves.length} movimientos destacados nuevos...`);
   
   const movePromises = missingMoves.map(async (move) => {
     try {
@@ -1079,11 +1174,8 @@ async function loadFeaturedMovesDetails() {
           name.language.name === 'es'
         )?.name;
         
-        // Si no hay nombre en español, saltar este movimiento
-        if (!spanishName) {
-          console.warn(`Movimiento ${move.move.name} no tiene nombre en español, omitiendo`);
-          return null;
-        }
+        // Si no hay nombre en español, usar el nombre en inglés con indicación
+        const finalMoveName = spanishName || `${move.move.name.replace('-', ' ')} (en inglés - no disponible en español)`;
         
         // Obtener información del nivel de aprendizaje
         const moveEntry = move.version_group_details.find(entry => 
@@ -1097,7 +1189,7 @@ async function loadFeaturedMovesDetails() {
           power: moveData.power || '-',
           accuracy: moveData.accuracy || '-',
           pp: moveData.pp || '-',
-          spanishName: spanishName,
+          spanishName: finalMoveName,
           damage_class: moveData.damage_class?.name || 'status',
           level_learned_at: learnLevel,
           learn_method: learnMethod,
@@ -1115,7 +1207,7 @@ async function loadFeaturedMovesDetails() {
         power: '-',
         accuracy: '-',
         pp: '-',
-        spanishName: 'Nombre no disponible en español',
+        spanishName: `${move.move.name.replace('-', ' ')} (en inglés - error al cargar)`,
         damage_class: 'status',
         level_learned_at: null,
         learn_method: 'unknown',
@@ -1133,6 +1225,7 @@ async function loadFeaturedMovesDetails() {
     }
   });
   
+  console.log(`✅ Movimientos destacados cargados: ${Object.keys(details).length} total`);
   return details;
 }
 
@@ -1166,11 +1259,11 @@ async function loadAbilitiesDetails() {
           name.language.name === 'es'
         )?.name;
         
-        // Si no hay nombre en español, usar fallback
+        // Si no hay nombre en español, usar fallback con nombre en inglés
         if (!spanishName) {
           console.warn(`Habilidad ${ability.ability.name} no tiene nombre en español`);
           const fallbackInfo = {
-            spanishName: 'Nombre no disponible en español',
+            spanishName: `${ability.ability.name.replace('-', ' ')} (en inglés - no disponible en español)`,
             is_hidden: ability.is_hidden || false
           };
           abilitiesCache.value[ability.ability.name] = fallbackInfo;
@@ -1189,7 +1282,7 @@ async function loadAbilitiesDetails() {
     } catch (err) {
       console.error(`Error cargando ${ability.ability.name}:`, err);
       const fallbackInfo = {
-        spanishName: 'Nombre no disponible en español',
+        spanishName: `${ability.ability.name.replace('-', ' ')} (en inglés - error al cargar)`,
         is_hidden: ability.is_hidden || false
       };
       abilitiesCache.value[ability.ability.name] = fallbackInfo;
@@ -1248,11 +1341,8 @@ async function loadMovesDetails() {
             name.language.name === 'es'
           )?.name;
           
-          // Si no hay nombre en español, saltar este movimiento
-          if (!spanishName) {
-            console.warn(`Movimiento ${move.move.name} no tiene nombre en español, omitiendo`);
-            return null;
-          }
+          // Si no hay nombre en español, usar el nombre en inglés con indicación
+          const finalMoveName = spanishName || `${move.move.name.replace('-', ' ')} (en inglés - no disponible en español)`;
           
           // Obtener información del nivel de aprendizaje
           const moveEntry = move.version_group_details.find(entry => 
@@ -1266,7 +1356,7 @@ async function loadMovesDetails() {
             power: moveData.power || '-',
             accuracy: moveData.accuracy || '-',
             pp: moveData.pp || '-',
-            spanishName: spanishName,
+            spanishName: finalMoveName,
             damage_class: moveData.damage_class?.name || 'status',
             level_learned_at: learnLevel,
             learn_method: learnMethod,
@@ -1284,7 +1374,7 @@ async function loadMovesDetails() {
           power: '-',
           accuracy: '-',
           pp: '-',
-          spanishName: 'Nombre no disponible en español',
+          spanishName: `${move.move.name.replace('-', ' ')} (en inglés - error al cargar)`,
           damage_class: 'status',
           level_learned_at: null,
           learn_method: 'unknown',
@@ -1362,10 +1452,8 @@ async function showMoveDetails(moveName) {
       name.language.name === 'es'
     )?.name;
     
-    // Si no hay nombre en español, mostrar error
-    if (!spanishName) {
-      throw new Error('Este movimiento no tiene traducción al español disponible');
-    }
+    // Si no hay nombre en español, usar el nombre en inglés con indicación
+    const finalMoveName = spanishName || `${fullMoveData.name.replace('-', ' ')} (en inglés - no disponible en español)`;
     
     // Buscar descripción SOLO en español
     const description = fullMoveData.effect_entries.find(entry => 
@@ -1377,9 +1465,22 @@ async function showMoveDetails(moveName) {
       entry.language.name === 'es'
     )?.flavor_text || '';
     
-    // Si no hay descripción en español, usar un mensaje por defecto
-    const finalDescription = shortDescription && shortDescription.trim() !== '' ? 
-      shortDescription : (description || 'Descripción en español no disponible');
+    // Si no hay descripción en español, usar descripción en inglés con indicación
+    let finalDescription = '';
+    if (shortDescription && shortDescription.trim() !== '') {
+      finalDescription = shortDescription;
+    } else if (description && description.trim() !== '') {
+      finalDescription = description;
+    } else {
+      // Buscar descripción en inglés como fallback
+      const englishDescription = fullMoveData.flavor_text_entries.find(entry => 
+        entry.language.name === 'en'
+      )?.flavor_text || '';
+      
+      finalDescription = englishDescription ? 
+        `${englishDescription} (en inglés - no disponible en español)` : 
+        'Descripción no disponible';
+    }
     
     // Traducir categoría de daño
     const damageClassTranslations = {
@@ -1391,7 +1492,7 @@ async function showMoveDetails(moveName) {
     // Crear objeto con todos los detalles
     const moveDetails = {
       name: fullMoveData.name,
-      spanishName: spanishName,
+      spanishName: finalMoveName,
       type: fullMoveData.type?.name || 'normal',
       power: fullMoveData.power || '-',
       accuracy: fullMoveData.accuracy || '-',
@@ -1421,12 +1522,12 @@ async function showMoveDetails(moveName) {
     console.error('Error cargando detalles del movimiento:', error);
     selectedMove.value = {
       name: moveName,
-      spanishName: 'Nombre no disponible en español',
+      spanishName: `${moveName.replace('-', ' ')} (en inglés - error al cargar)`,
       type: 'normal',
       power: '-',
       accuracy: '-',
       pp: '-',
-      description: 'Este movimiento no tiene traducción al español disponible.',
+      description: 'Error al cargar descripción del movimiento.',
       damage_class: 'unknown',
       damage_class_spanish: 'Desconocido'
     };
@@ -1472,29 +1573,51 @@ async function showAbilityDetails(abilityName) {
                        name.language.name === 'es'
                      )?.name;
     
-    // Si no hay nombre en español, mostrar error
-    if (!spanishName) {
-      throw new Error('Esta habilidad no tiene traducción al español disponible');
-    }
+    // Si no hay nombre en español, usar el nombre en inglés con indicación
+    const finalAbilityName = spanishName || `${abilityName.replace('-', ' ')} (en inglés - no disponible en español)`;
     
     // Buscar descripción SOLO en español
     const description = fullAbilityData.flavor_text_entries.find(entry => 
       entry.language.name === 'es'
-    )?.flavor_text || 'Descripción en español no disponible';
+    )?.flavor_text || '';
+    
+    // Si no hay descripción en español, buscar en inglés como fallback
+    let finalDescription = '';
+    if (description && description.trim() !== '') {
+      finalDescription = description;
+    } else {
+      const englishDescription = fullAbilityData.flavor_text_entries.find(entry => 
+        entry.language.name === 'en'
+      )?.flavor_text || '';
+      
+      finalDescription = englishDescription ? 
+        `${englishDescription} (en inglés - no disponible en español)` : 
+        'Descripción no disponible';
+    }
     
     // Buscar efecto detallado SOLO en español
     const spanishEffect = fullAbilityData.effect_entries.find(entry => 
       entry.language.name === 'es'
     )?.effect || '';
     
-    // Si no hay efecto en español, no mostrar el efecto detallado
-    const finalEffect = spanishEffect && spanishEffect.trim() !== '' ? spanishEffect : '';
+    // Si no hay efecto en español, buscar en inglés como fallback
+    let finalEffect = '';
+    if (spanishEffect && spanishEffect.trim() !== '') {
+      finalEffect = spanishEffect;
+    } else {
+      const englishEffect = fullAbilityData.effect_entries.find(entry => 
+        entry.language.name === 'en'
+      )?.effect || '';
+      
+      finalEffect = englishEffect ? 
+        `${englishEffect} (en inglés - no disponible en español)` : '';
+    }
     
     // Crear objeto con todos los detalles
     const abilityDetails = {
       name: fullAbilityData.name,
-      spanishName: spanishName,
-      description: description.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(),
+      spanishName: finalAbilityName,
+      description: finalDescription.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(),
       effect: finalEffect.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(),
       is_hidden: abilityData?.is_hidden || false,
       generation: fullAbilityData.generation?.name || null
@@ -1555,8 +1678,8 @@ const filteredAndSortedMoves = computed(() => {
       learn_method: learnMethod
     };
   }).filter(move => {
-    // Solo mostrar movimientos que tienen datos en español
-    return move.details && move.details.spanishName && move.details.spanishName !== 'Nombre no disponible en español';
+    // Mostrar todos los movimientos que tienen datos (ahora incluyen nombres en inglés cuando no hay español)
+    return move.details && move.details.spanishName;
   });
   
   // Filtrar por tipo de daño
@@ -1701,8 +1824,8 @@ function getMoveNameInSpanish(moveName) {
     return movesCache.value[moveName].spanishName;
   }
   
-  // Si no hay nombre en español, mostrar un mensaje claro
-  return 'Nombre no disponible en español';
+  // Si no hay nombre en español, mostrar el nombre en inglés con indicación
+  return `${moveName.replace('-', ' ')} (en inglés - no disponible en español)`;
 }
 
 // Función para obtener nombres de Pokémon en español
@@ -1740,12 +1863,12 @@ async function loadPokemonNameInSpanish(pokemonData) {
         console.log(`✅ Nombre en español para ${pokemonData.name}: ${spanishName}`);
       } else {
         console.warn(`❌ No se encontró nombre en español para ${pokemonData.name}`);
-        pokemonData.spanishName = pokemonData.name; // Fallback
+        pokemonData.spanishName = `${pokemonData.name} (en inglés - no disponible en español)`; // Fallback con indicación
       }
     }
   } catch (error) {
     console.error(`Error cargando nombre en español para ${pokemonData.name}:`, error);
-    pokemonData.spanishName = pokemonData.name; // Fallback
+    pokemonData.spanishName = `${pokemonData.name} (en inglés - no disponible en español)`; // Fallback con indicación
   }
   
   return pokemonData;
@@ -1837,7 +1960,7 @@ function getAbilityNameInSpanish(abilityName) {
     'air-lock': 'Esfera Aérea'
   };
   
-  return abilityTranslations[abilityName] || 'Nombre no disponible en español';
+  return abilityTranslations[abilityName] || `${abilityName.replace('-', ' ')} (en inglés - no disponible en español)`;
 }
 
 // Función para obtener nombres de estadísticas en español
