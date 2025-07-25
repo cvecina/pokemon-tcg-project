@@ -99,8 +99,8 @@
             <input
               v-model="searchTerm"
               type="text"
-              placeholder="Buscar cartas por nombre..."
-              class="w-full pl-10 pr-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              placeholder="Buscar cartas por nombre (mín. 2 caracteres)..."
+              class="w-full pl-10 pr-12 py-3 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center">
               <svg
@@ -116,6 +116,22 @@
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                 />
               </svg>
+            </div>
+
+            <!-- Indicador de búsqueda pendiente -->
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+              <div v-if="isSearchPending" class="flex items-center space-x-2">
+                <div
+                  class="loading loading-spinner loading-sm text-orange-400"
+                ></div>
+                <span class="text-xs text-orange-300">Buscando...</span>
+              </div>
+              <div v-else-if="loading" class="flex items-center space-x-2">
+                <div
+                  class="loading loading-spinner loading-sm text-green-400"
+                ></div>
+                <span class="text-xs text-green-300">Cargando...</span>
+              </div>
             </div>
           </div>
 
@@ -162,27 +178,6 @@
           </select>
         </div>
 
-        <!-- Filtro por set/expansión -->
-        <div class="mb-6">
-          <label class="block text-white/90 text-sm font-medium mb-2"
-            >Expansión:</label
-          >
-          <select
-            v-model="selectedSet"
-            class="w-full px-4 py-3 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-400"
-          >
-            <option value="" class="text-black">Todas las expansiones</option>
-            <option
-              v-for="set in sets"
-              :key="set.id"
-              :value="set.id"
-              class="text-black"
-            >
-              {{ set.name }} ({{ set.releaseDate }})
-            </option>
-          </select>
-        </div>
-
         <!-- Botones de filtro rápido -->
         <div class="mb-4">
           <p class="text-white/90 text-sm font-medium mb-3">Filtros rápidos:</p>
@@ -211,19 +206,43 @@
         </div>
 
         <!-- Stats de búsqueda -->
-        <div v-if="totalCards > 0 && !loading" class="text-white/70 text-sm">
+        <div
+          v-if="totalCards > 0 && !loading && !isSearchPending"
+          class="text-white/70 text-sm"
+        >
           Mostrando {{ cards.length }} de
           {{ totalCards.toLocaleString() }} cartas
+          <span class="text-green-400 ml-2">🚀 API directa</span>
+        </div>
+        <div
+          v-else-if="
+            isSearchPending &&
+            searchTerm.length > 0 &&
+            searchTerm.length < MIN_SEARCH_LENGTH
+          "
+          class="text-white/70 text-sm"
+        >
+          ✍️ Escribe al menos {{ MIN_SEARCH_LENGTH }} caracteres para buscar...
+        </div>
+        <div v-else-if="isSearchPending" class="text-white/70 text-sm">
+          ⏳ Esperando a que termines de escribir...
+        </div>
+        <div
+          v-else-if="loading"
+          class="text-white/70 text-sm flex items-center space-x-2"
+        >
+          <div class="loading loading-spinner loading-sm"></div>
+          <span>Conexión directa a Pokémon TCG API...</span>
         </div>
       </div>
 
-      <!-- Loading -->
-      <div v-if="loading" class="flex justify-center py-12">
+      <!-- Loading inicial (solo para primera carga) -->
+      <div v-if="loading && currentPage === 1" class="flex justify-center py-12">
         <div class="loading loading-spinner loading-lg text-white"></div>
       </div>
 
       <!-- Mensaje de error -->
-      <div v-else-if="error" class="text-center py-12">
+      <div v-else-if="error && cards.length === 0" class="text-center py-12">
         <div class="text-6xl mb-4">😔</div>
         <h3 class="text-xl font-bold text-white mb-2">
           Error al cargar cartas
@@ -233,13 +252,13 @@
           @click="searchCards"
           class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium"
         >
-          Intentar de nuevo
+          Reintentar carga desde API
         </button>
       </div>
 
       <!-- Grid de cartas -->
       <div
-        v-else-if="cards.length > 0"
+        v-if="cards.length > 0"
         class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6"
       >
         <div
@@ -259,6 +278,8 @@
               class="w-full h-full object-cover transition-transform group-hover:scale-110"
               @error="handleImageError"
               loading="lazy"
+              decoding="async"
+              fetchpriority="low"
             />
             <div
               v-else
@@ -335,23 +356,113 @@
       </div>
 
       <!-- Sin resultados -->
-      <div v-else class="text-center py-12">
+      <div v-else-if="cards.length === 0 && !loading" class="text-center py-12">
         <div class="text-6xl mb-4">🔍</div>
         <h3 class="text-xl font-bold text-white mb-2">
-          No se encontraron cartas
+          ¡Busca cartas para comenzar!
         </h3>
-        <p class="text-white/80">Intenta ajustar tus filtros de búsqueda</p>
+        <p class="text-white/80 mb-4">
+          Escribe el nombre de una carta, selecciona un tipo o usa los filtros
+          rápidos para empezar a explorar.
+        </p>
+        <div class="text-white/60 text-sm">
+          💡 Tip: Prueba buscar "Pikachu", "Charizard" o usa los filtros rápidos
+          de arriba
+        </div>
+      </div>
+
+      <!-- Error al cargar más cartas (no oculta las existentes) -->
+      <div v-if="error && cards.length > 0" class="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mx-auto max-w-2xl mb-6">
+        <div class="flex items-center space-x-3">
+          <div class="text-2xl">⚠️</div>
+          <div>
+            <h4 class="text-red-300 font-medium">Error al cargar más cartas</h4>
+            <p class="text-red-200 text-sm">{{ error }}</p>
+            <button
+              @click="loadMore"
+              class="mt-2 bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded text-sm transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Elemento invisible para auto-carga (Intersection Observer) -->
+      <div 
+        v-if="hasMore && cards.length > 0" 
+        ref="autoLoadRef" 
+        class="h-20 flex items-center justify-center bg-white/5 rounded-lg my-4"
+      >
+        <div v-if="loading && currentPage > 1" class="flex items-center space-x-3 text-white/70">
+          <div class="loading loading-spinner loading-md text-orange-400"></div>
+          <span class="text-sm">Cargando más cartas automáticamente... (Página {{ currentPage }})</span>
+        </div>
+        <div v-else class="text-white/60 text-sm text-center">
+          <div class="mb-1">📍 Zona de auto-carga activa</div>
+          <div class="text-xs">Quedan {{ totalCards - cards.length }} cartas por cargar</div>
+        </div>
       </div>
 
       <!-- Cargar más -->
       <div v-if="hasMore && cards.length > 0" class="text-center mt-8">
-        <button
-          @click="loadMore"
-          :disabled="loading"
-          class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-bold transition-colors disabled:opacity-50"
-        >
-          {{ loading ? "Cargando..." : "Cargar Más Cartas" }}
-        </button>
+        <!-- Controles manuales opcionales -->
+        <div class="mb-4">
+          <button
+            @click="toggleManualControls"
+            class="text-white/70 hover:text-white text-sm underline transition-colors"
+          >
+            {{ showManualControls ? '🔼 Ocultar controles manuales' : '🔽 Mostrar controles manuales' }}
+          </button>
+        </div>
+        
+        <div v-if="showManualControls" class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <button
+            @click="loadMore"
+            :disabled="loading"
+            class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span
+              v-if="loading && currentPage > 1"
+              class="flex items-center space-x-2"
+            >
+              <div class="loading loading-spinner loading-sm"></div>
+              <span>Cargando página {{ currentPage }}...</span>
+            </span>
+            <span v-else-if="loading">Cargando...</span>
+            <span v-else
+              >⚡ Cargar Más ({{
+                totalCards - cards.length
+              }}
+              restantes)</span
+            >
+          </button>
+
+          <button
+            @click="loadAllCards"
+            :disabled="loading || totalCards > 1000"
+            class="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+          >
+            <span>🚀</span>
+            <span v-if="loading && isLoadingAll">
+              <div class="flex items-center space-x-2">
+                <div class="loading loading-spinner loading-sm"></div>
+                <span>Cargando todas...</span>
+              </div>
+            </span>
+            <span v-else-if="totalCards > 1000"
+              >Demasiadas cartas ({{ totalCards }})</span
+            >
+            <span v-else>Cargar Todas ({{ totalCards }})</span>
+          </button>
+        </div>        <div v-if="totalCards > 1000" class="text-yellow-300 text-sm mt-2">
+          ⚠️ Hay {{ totalCards.toLocaleString() }} cartas. La auto-carga funciona mejor con filtros específicos.
+        </div>
+        
+        <!-- Información de auto-carga -->
+        <div class="text-white/60 text-xs mt-3">
+          💡 Las cartas se cargan automáticamente al hacer scroll hacia abajo
+        </div>
       </div>
     </main>
 
@@ -417,6 +528,16 @@
                   :src="selectedCard.images.large"
                   :alt="selectedCard.name"
                   class="max-w-full h-auto mx-auto rounded-lg shadow-2xl max-h-96"
+                  loading="eager"
+                  decoding="async"
+                />
+                <img
+                  v-else-if="selectedCard.images?.small"
+                  :src="selectedCard.images.small"
+                  :alt="selectedCard.name"
+                  class="max-w-full h-auto mx-auto rounded-lg shadow-2xl max-h-96"
+                  loading="eager"
+                  decoding="async"
                 />
                 <div
                   v-else
@@ -653,18 +774,25 @@
 // Estados reactivos
 const authStore = useAuthStore();
 const searchTerm = ref("");
-const selectedSet = ref("");
 const selectedRarity = ref("");
 const selectedType = ref("");
 const activeFilter = ref("");
 const cards = ref([]);
-const sets = ref([]);
 const loading = ref(false);
 const error = ref("");
 const selectedCard = ref(null);
 const currentPage = ref(1);
 const hasMore = ref(true);
 const totalCards = ref(0);
+const isLoadingAll = ref(false); // Nueva variable para indicar carga masiva
+const autoLoadRef = ref(null); // Referencia para el observer de auto-carga
+const showManualControls = ref(false); // Controlar visibilidad de botones manuales
+
+// Variables para debouncing
+const searchTimeout = ref(null);
+const DEBOUNCE_DELAY = 400; // Reducido a 400ms para respuesta más rápida
+const MIN_SEARCH_LENGTH = 2; // Reducido a 2 caracteres para buscar más rápido
+const isSearchPending = ref(false); // Indica si hay una búsqueda pendiente
 
 // Filtros rápidos
 const quickFilters = [
@@ -692,48 +820,128 @@ const pokemonTypes = [
 
 // Cargar datos iniciales
 onMounted(async () => {
-  console.log("🚀 Iniciando carga de datos con endpoints del servidor...");
-
-  await loadSets();
-  await searchCards();
+  console.log("🚀 Componente montado - esperando búsqueda del usuario");
+  
+  // Configurar Intersection Observer para auto-carga
+  setupAutoLoad();
+  
+  // No cargar cartas automáticamente, solo mostrar mensaje inicial
+  // El usuario debe buscar algo para ver resultados
 });
 
-// Watchers para búsqueda automática
-watch(
-  [searchTerm, selectedSet, selectedRarity, selectedType],
-  () => {
-    resetSearch();
-    searchCards();
-  },
-  { debounce: 800 }
-);
-
-// Funciones
-async function loadSets() {
-  try {
-    console.log("🔥 Cargando sets desde nuestro endpoint...");
-
-    const response = await $fetch('/api/pokemon-tcg/sets', {
-      query: {
-        pageSize: 50,
-        orderBy: '-releaseDate'
+// Configurar auto-carga con Intersection Observer
+function setupAutoLoad() {
+  if (typeof window === 'undefined') return; // SSR safety
+  
+  let observer;
+  
+  const createObserver = () => {
+    if (observer) {
+      observer.disconnect();
+    }
+    
+    observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && hasMore.value && !loading.value && cards.value.length > 0) {
+            console.log('🔄 Auto-cargando más cartas... Current page:', currentPage.value);
+            loadMore();
+          }
+        });
+      },
+      {
+        rootMargin: '200px', // Aumentado a 200px para cargar antes
+        threshold: 0.1
+      }
+    );
+    
+    return observer;
+  };
+  
+  // Función para re-observar el elemento
+  const observeElement = () => {
+    nextTick(() => {
+      if (autoLoadRef.value && observer) {
+        observer.observe(autoLoadRef.value);
+        console.log('👁️ Observando elemento para auto-carga');
       }
     });
-
-    console.log("✅ Sets cargados exitosamente:", response);
-
-    // Filtrar sets más populares y recientes
-    sets.value = response.data
-      .filter((set) => set.images?.logo) // Solo sets con logo
-      .slice(0, 30); // Top 30 sets más recientes
-
-    console.log("📋 Sets filtrados y guardados:", sets.value.length, "sets");
-  } catch (err) {
-    console.error("❌ Error cargando sets:", err);
-    // El endpoint ya maneja los datos de respaldo, no necesitamos duplicarlos aquí
-  }
+  };
+  
+  // Crear observer inicial
+  observer = createObserver();
+  
+  // Observar cuando el elemento esté disponible
+  observeElement();
+  
+  // Re-observar después de cada carga
+  watch([cards, hasMore], () => {
+    if (hasMore.value && cards.value.length > 0) {
+      observeElement();
+    }
+  }, { flush: 'post' });
+  
+  // Limpiar observer al desmontar
+  onUnmounted(() => {
+    if (observer) {
+      observer.disconnect();
+    }
+  });
 }
 
+// Función para manejar el debouncing de búsqueda
+function debouncedSearch() {
+  // Limpiar el timeout anterior si existe
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value);
+  }
+
+  // Si la búsqueda es muy corta, no buscar
+  if (
+    searchTerm.value.trim() &&
+    searchTerm.value.trim().length < MIN_SEARCH_LENGTH
+  ) {
+    console.log(
+      `⚠️ Búsqueda muy corta (${searchTerm.value.length} caracteres), esperando al menos ${MIN_SEARCH_LENGTH}`
+    );
+    isSearchPending.value = true;
+    return;
+  }
+
+  // Indicar que hay una búsqueda pendiente
+  isSearchPending.value = true;
+
+  // Configurar nuevo timeout
+  searchTimeout.value = setTimeout(() => {
+    console.log("🔍 Ejecutando búsqueda después del debounce...");
+    isSearchPending.value = false;
+    resetSearch();
+    searchCards();
+  }, DEBOUNCE_DELAY);
+}
+
+// Watchers para búsqueda con debouncing
+watch(searchTerm, () => {
+  console.log("✍️ Usuario escribiendo:", searchTerm.value);
+  debouncedSearch();
+});
+
+// Para filtros, búsqueda inmediata (sin debouncing)
+watch([selectedRarity, selectedType], () => {
+  console.log("🎛️ Filtros cambiados, búsqueda inmediata");
+  resetSearch();
+  searchCards();
+});
+
+// Limpiar timeout al desmontar el componente
+onUnmounted(() => {
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value);
+  }
+  isSearchPending.value = false;
+});
+
+// Funciones
 function resetSearch() {
   cards.value = [];
   currentPage.value = 1;
@@ -742,205 +950,327 @@ function resetSearch() {
 }
 
 async function searchCards() {
-  if (loading.value) return;
+  if (loading.value) {
+    console.log("⚠️ Ya hay una búsqueda en curso");
+    return;
+  }
+
+  // Si es la primera página, validar filtros
+  if (currentPage.value === 1) {
+    // Validar longitud mínima de búsqueda si hay texto
+    const hasValidSearch =
+      !searchTerm.value.trim() ||
+      searchTerm.value.trim().length >= MIN_SEARCH_LENGTH;
+
+    // No buscar si no hay filtros aplicados O si la búsqueda es muy corta
+    if (
+      !hasValidSearch ||
+      (!searchTerm.value.trim() &&
+        !selectedRarity.value &&
+        !selectedType.value &&
+        !activeFilter.value)
+    ) {
+      if (!hasValidSearch) {
+        console.log(
+          `⚠️ Búsqueda muy corta (${searchTerm.value.length} caracteres), necesitas al menos ${MIN_SEARCH_LENGTH}`
+        );
+      } else {
+        console.log(
+          "⚠️ No hay filtros - no se ejecuta búsqueda para evitar carga masiva"
+        );
+      }
+      cards.value = [];
+      totalCards.value = 0;
+      hasMore.value = false;
+      return;
+    }
+  }
 
   loading.value = true;
   error.value = "";
 
   try {
-    console.log("🔍 Iniciando búsqueda a través de nuestro endpoint...");
+    const isLoadingMore = currentPage.value > 1;
+    console.log(
+      isLoadingMore
+        ? `📄 Cargando página ${currentPage.value}...`
+        : "🔍 Buscando cartas directamente desde API de Pokémon TCG..."
+    );
 
-    // Construir query para nuestro endpoint
-    const queryParams = {
-      pageSize: 24,
-      page: currentPage.value,
-      orderBy: '-set.releaseDate'
-    };
+    // Construir URL de la API directa de Pokémon TCG
+    const baseUrl = "https://api.pokemontcg.io/v2/cards";
+    const params = new URLSearchParams();
 
-    // Construir filtros para la API de Pokémon TCG
+    // Parámetros de paginación
+    params.append("pageSize", "8"); // Reducido a 8 para carga más rápida
+    params.append("page", currentPage.value.toString());
+    params.append("orderBy", "-set.releaseDate");
+
+    // Construir filtros para la API de Pokémon TCG (simplificados)
     const filters = [];
-    
+
     if (searchTerm.value.trim()) {
-      filters.push(`name:"*${searchTerm.value.trim()}*"`);
+      // Búsqueda más simple y rápida
+      filters.push(`name:${searchTerm.value.trim()}`);
     }
-    
-    if (selectedSet.value) {
-      filters.push(`set.id:${selectedSet.value}`);
-    }
-    
+
     if (selectedRarity.value) {
       filters.push(`rarity:"${selectedRarity.value}"`);
     }
-    
+
     if (selectedType.value) {
       filters.push(`types:${selectedType.value}`);
     }
-    
+
     if (activeFilter.value) {
-      if (activeFilter.value === 'Pokémon') {
-        filters.push('supertype:Pokémon');
-      } else if (activeFilter.value === 'Trainer') {
-        filters.push('supertype:Trainer');
-      } else if (activeFilter.value === 'Energy') {
-        filters.push('supertype:Energy');
-      } else if (activeFilter.value.includes('Rare')) {
+      if (activeFilter.value === "Pokémon") {
+        filters.push("supertype:Pokémon");
+      } else if (activeFilter.value === "Trainer") {
+        filters.push("supertype:Trainer");
+      } else if (activeFilter.value === "Energy") {
+        filters.push("supertype:Energy");
+      } else if (activeFilter.value.includes("Rare")) {
         filters.push(`rarity:"${activeFilter.value}"`);
       }
     }
 
     // Si hay filtros, agregarlos como query 'q'
     if (filters.length > 0) {
-      queryParams.q = filters.join(' ');
+      params.append("q", filters.join(" "));
     }
 
-    console.log("📋 Parámetros de búsqueda:", queryParams);
+    const url = `${baseUrl}?${params.toString()}`;
+    console.log("📋 URL de búsqueda:", url);
 
-    const data = await $fetch('/api/pokemon-tcg/cards', {
-      query: queryParams
+    // Hacer la petición directa con fetch nativo (más rápido)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout de 10 segundos
+
+    const response = await fetch(url, {
+      // Sin API key para evitar límites - la API pública es gratis
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status}`);
+    }
+
+    const data = await response.json();
+
     console.log("✅ Datos recibidos:", {
+      page: currentPage.value,
       totalCount: data.totalCount,
       cardsReceived: data.data?.length || 0,
+      isLoadingMore,
     });
 
     if (currentPage.value === 1) {
+      // Nueva búsqueda - reemplazar cartas
       cards.value = data.data || [];
     } else {
+      // Cargar más - agregar cartas
       cards.value.push(...(data.data || []));
     }
 
     totalCards.value = data.totalCount || 0;
-    hasMore.value = currentPage.value * 24 < totalCards.value;
+    hasMore.value = currentPage.value * 8 < totalCards.value; // Actualizado para pageSize 8
 
-    console.log("🎯 Cartas cargadas:", cards.value.length);
-
-    // El endpoint ya maneja los datos de respaldo, no necesitamos duplicarlos aquí
+    console.log("🎯 Estado final:", {
+      totalCardsLoaded: cards.value.length,
+      totalCardsAvailable: totalCards.value,
+      hasMore: hasMore.value,
+      currentPage: currentPage.value,
+    });
   } catch (err) {
     console.error("❌ Error en búsqueda:", err);
-    error.value = "Error cargando cartas. Verifica tu conexión.";
+    if (err.name === "AbortError") {
+      error.value =
+        "La búsqueda tardó demasiado. Intenta con términos más específicos.";
+    } else {
+      error.value = "Error cargando cartas desde la API. Verifica tu conexión.";
+    }
+    
+    // Si es la primera página, no hay cartas para mostrar
+    // Si no, mantenemos las cartas existentes y solo mostramos el error
+    if (currentPage.value === 1) {
+      cards.value = [];
+      hasMore.value = false;
+    }
   } finally {
     loading.value = false;
   }
 }
 
-function useExampleCards() {
-  const exampleCards = [
-    {
-      id: "base1-4",
-      name: "Charizard",
-      supertype: "Pokémon",
-      subtypes: ["Stage 2"],
-      hp: "120",
-      types: ["Fire"],
-      rarity: "Rare Holo",
-      artist: "Mitsuhiro Arita",
-      set: {
-        id: "base1",
-        name: "Base Set",
-        releaseDate: "1999/01/09",
-      },
-      number: "4",
-      attacks: [
-        {
-          name: "Fire Spin",
-          cost: ["Fire", "Fire", "Fire", "Fire"],
-          damage: "100",
-          text: "Discard 2 Energy cards attached to Charizard in order to use this attack.",
-        },
-      ],
-      weaknesses: [
-        {
-          type: "Water",
-          value: "×2",
-        },
-      ],
-      images: {
-        small: "https://images.pokemontcg.io/base1/4.png",
-        large: "https://images.pokemontcg.io/base1/4_hires.png",
-      },
-      tcgplayer: {
-        prices: {
-          holofoil: {
-            low: 89.99,
-            mid: 150.0,
-            high: 299.99,
-            market: 175.5,
-          },
-        },
-      },
-    },
-    {
-      id: "base1-25",
-      name: "Pikachu",
-      supertype: "Pokémon",
-      subtypes: ["Basic"],
-      hp: "60",
-      types: ["Lightning"],
-      rarity: "Common",
-      artist: "Mitsuhiro Arita",
-      set: {
-        id: "base1",
-        name: "Base Set",
-        releaseDate: "1999/01/09",
-      },
-      number: "25",
-      attacks: [
-        {
-          name: "Thunder Jolt",
-          cost: ["Lightning", "Colorless"],
-          damage: "30",
-          text: "Flip a coin. If tails, Pikachu does 10 damage to itself.",
-        },
-      ],
-      weaknesses: [
-        {
-          type: "Fighting",
-          value: "×2",
-        },
-      ],
-      images: {
-        small: "https://images.pokemontcg.io/base1/25.png",
-        large: "https://images.pokemontcg.io/base1/25_hires.png",
-      },
-      tcgplayer: {
-        prices: {
-          normal: {
-            low: 1.99,
-            mid: 3.5,
-            high: 8.99,
-            market: 4.25,
-          },
-        },
-      },
-    },
-  ];
-
-  cards.value = exampleCards;
-  totalCards.value = exampleCards.length;
-  hasMore.value = false;
-  console.log("Cartas de ejemplo cargadas:", exampleCards.length);
-}
-
 function quickFilter(type) {
   activeFilter.value = activeFilter.value === type ? "" : type;
+  console.log("⚡ Filtro rápido aplicado:", type);
+
+  // Limpiar cualquier búsqueda pendiente
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value);
+  }
+  isSearchPending.value = false;
+
   resetSearch();
   searchCards();
 }
 
 function clearFilters() {
   activeFilter.value = "";
-  selectedSet.value = "";
   selectedRarity.value = "";
   selectedType.value = "";
   searchTerm.value = "";
+
+  console.log("🧹 Todos los filtros limpiados");
+
+  // Limpiar cualquier búsqueda pendiente
+  if (searchTimeout.value) {
+    clearTimeout(searchTimeout.value);
+  }
+  isSearchPending.value = false;
+
   resetSearch();
   searchCards();
 }
 
 function loadMore() {
+  if (loading.value || !hasMore.value) {
+    console.log("⚠️ No se puede cargar más:", {
+      loading: loading.value,
+      hasMore: hasMore.value,
+    });
+    return;
+  }
+
+  console.log("📄 Cargando página siguiente:", currentPage.value + 1, "Auto-carga activada");
   currentPage.value++;
   searchCards();
+}
+
+async function loadAllCards() {
+  if (loading.value || !hasMore.value || totalCards.value > 1000) {
+    console.log("⚠️ No se puede cargar todas las cartas");
+    return;
+  }
+
+  console.log(`🚀 Iniciando carga masiva de ${totalCards.value} cartas...`);
+  isLoadingAll.value = true;
+  loading.value = true;
+  error.value = "";
+
+  try {
+    // Calcular cuántas páginas necesitamos cargar
+    const remainingCards = totalCards.value - cards.value.length;
+    const pagesNeeded = Math.ceil(remainingCards / 8);
+
+    console.log(
+      `📊 Cargando ${pagesNeeded} páginas adicionales para obtener ${remainingCards} cartas restantes`
+    );
+
+    // Cargar todas las páginas en paralelo para máxima velocidad
+    const promises = [];
+    for (
+      let page = currentPage.value + 1;
+      page <= currentPage.value + pagesNeeded;
+      page++
+    ) {
+      promises.push(loadPage(page));
+    }
+
+    const results = await Promise.all(promises);
+
+    // Combinar todos los resultados
+    const allNewCards = results.flat().filter((card) => card); // Filtrar nulls
+    cards.value.push(...allNewCards);
+
+    console.log(
+      `✅ Carga masiva completada: ${allNewCards.length} cartas adicionales cargadas`
+    );
+    console.log(
+      `🎯 Total de cartas ahora: ${cards.value.length} de ${totalCards.value}`
+    );
+
+    hasMore.value = false;
+    currentPage.value = currentPage.value + pagesNeeded;
+  } catch (err) {
+    console.error("❌ Error en carga masiva:", err);
+    error.value = "Error cargando todas las cartas. Intenta cargar de a poco.";
+  } finally {
+    loading.value = false;
+    isLoadingAll.value = false;
+  }
+}
+
+async function loadPage(pageNumber) {
+  try {
+    console.log(`📄 Cargando página ${pageNumber}...`);
+
+    // Construir URL igual que en searchCards pero para página específica
+    const baseUrl = "https://api.pokemontcg.io/v2/cards";
+    const params = new URLSearchParams();
+
+    params.append("pageSize", "8");
+    params.append("page", pageNumber.toString());
+    params.append("orderBy", "-set.releaseDate");
+
+    // Usar los mismos filtros que la búsqueda actual
+    const filters = [];
+
+    if (searchTerm.value.trim()) {
+      filters.push(`name:${searchTerm.value.trim()}`);
+    }
+
+    if (selectedRarity.value) {
+      filters.push(`rarity:"${selectedRarity.value}"`);
+    }
+
+    if (selectedType.value) {
+      filters.push(`types:${selectedType.value}`);
+    }
+
+    if (activeFilter.value) {
+      if (activeFilter.value === "Pokémon") {
+        filters.push("supertype:Pokémon");
+      } else if (activeFilter.value === "Trainer") {
+        filters.push("supertype:Trainer");
+      } else if (activeFilter.value === "Energy") {
+        filters.push("supertype:Energy");
+      } else if (activeFilter.value.includes("Rare")) {
+        filters.push(`rarity:"${activeFilter.value}"`);
+      }
+    }
+
+    if (filters.length > 0) {
+      params.append("q", filters.join(" "));
+    }
+
+    const url = `${baseUrl}?${params.toString()}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Timeout más largo para carga masiva
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status} en página ${pageNumber}`);
+    }
+
+    const data = await response.json();
+    console.log(
+      `✅ Página ${pageNumber} cargada: ${data.data?.length || 0} cartas`
+    );
+
+    return data.data || [];
+  } catch (err) {
+    console.error(`❌ Error cargando página ${pageNumber}:`, err);
+    return []; // Retornar array vacío en caso de error
+  }
 }
 
 function selectCard(card) {
@@ -949,6 +1279,10 @@ function selectCard(card) {
 
 function closeModal() {
   selectedCard.value = null;
+}
+
+function toggleManualControls() {
+  showManualControls.value = !showManualControls.value;
 }
 
 // Funciones auxiliares para UI
@@ -1054,10 +1388,36 @@ useHead({
   overflow: hidden;
 }
 
-/* Animaciones */
+/* Animaciones mejoradas */
 .transition-all {
   transition: all 0.3s ease;
 }
+
+/* Animación suave para cartas que aparecen */
+.grid > div {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animación escalonada para múltiples cartas */
+.grid > div:nth-child(1) { animation-delay: 0.05s; }
+.grid > div:nth-child(2) { animation-delay: 0.1s; }
+.grid > div:nth-child(3) { animation-delay: 0.15s; }
+.grid > div:nth-child(4) { animation-delay: 0.2s; }
+.grid > div:nth-child(5) { animation-delay: 0.25s; }
+.grid > div:nth-child(6) { animation-delay: 0.3s; }
+.grid > div:nth-child(7) { animation-delay: 0.35s; }
+.grid > div:nth-child(8) { animation-delay: 0.4s; }
 
 /* Scrollbar personalizado */
 ::-webkit-scrollbar {
@@ -1075,5 +1435,17 @@ useHead({
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* Controles manuales expandibles */
+.manual-controls-enter-active,
+.manual-controls-leave-active {
+  transition: all 0.3s ease;
+}
+
+.manual-controls-enter-from,
+.manual-controls-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>
