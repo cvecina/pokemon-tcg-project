@@ -141,6 +141,45 @@
             </button>
           </div>
         </div>
+        
+        <!-- Estadísticas de caché y controles -->
+        <div class="mt-4 pt-4 border-t border-white/20">
+          <div class="flex flex-col lg:flex-row gap-4 items-center justify-between">
+            <!-- Estadísticas del caché -->
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="text-sm text-white/80">📊 Caché:</span>
+              <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-xs font-semibold">
+                🐾 {{ getCacheStats().pokemon }} Pokémon
+              </span>
+              <span class="bg-red-500/20 text-red-300 px-2 py-1 rounded text-xs font-semibold">
+                🥊 {{ getCacheStats().moves }} Movimientos
+              </span>
+              <span class="bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded text-xs font-semibold">
+                ⚡ {{ getCacheStats().abilities }} Habilidades
+              </span>
+              <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded text-xs font-semibold">
+                📈 {{ getCacheStats().total }} Total
+              </span>
+            </div>
+            
+            <!-- Controles del caché -->
+            <div class="flex gap-2">
+              <button 
+                @click="preloadPopularPokemon"
+                :disabled="loading"
+                class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                🚀 Precargar Populares
+              </button>
+              <button 
+                @click="clearAllCache"
+                class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+              >
+                🧹 Limpiar Caché
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Loading -->
@@ -633,11 +672,92 @@ const selectedAbility = ref(null);
 const showAbilityModal = ref(false);
 const loadingAbilityDetails = ref(false);
 
-// Caché global de movimientos para evitar recargas
-const movesCache = ref({});
+// Sistema de caché avanzado
+const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 horas en milisegundos
+const MAX_CACHE_SIZE = 1000; // Máximo número de elementos en caché
 
-// Caché global de habilidades
-const abilitiesCache = ref({});
+// Función para obtener datos del localStorage de forma segura
+function getFromLocalStorage(key, defaultValue = {}) {
+  if (process.client) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Verificar si tiene estructura de caché con timestamp
+        if (parsed.timestamp && (Date.now() - parsed.timestamp < CACHE_EXPIRY_TIME)) {
+          return parsed.data;
+        }
+      }
+    } catch (error) {
+      console.warn(`Error leyendo caché ${key}:`, error);
+    }
+  }
+  return defaultValue;
+}
+
+// Función para guardar en localStorage de forma segura
+function saveToLocalStorage(key, data) {
+  if (process.client) {
+    try {
+      const cacheEntry = {
+        data: data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(cacheEntry));
+    } catch (error) {
+      console.warn(`Error guardando caché ${key}:`, error);
+      // Si el localStorage está lleno, limpiar cachés antiguos
+      clearOldCache();
+    }
+  }
+}
+
+// Función para limpiar cachés antiguos
+function clearOldCache() {
+  if (process.client) {
+    const cacheKeys = ['pokemon-cache', 'moves-cache', 'abilities-cache'];
+    cacheKeys.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (error) {
+        console.warn(`Error limpiando caché ${key}:`, error);
+      }
+    });
+  }
+}
+
+// Función para limpiar caché si excede el tamaño máximo
+function trimCache(cache, maxSize = MAX_CACHE_SIZE) {
+  const keys = Object.keys(cache);
+  if (keys.length > maxSize) {
+    // Eliminar los elementos más antiguos (asumiendo que los más recientes están al final)
+    const toRemove = keys.length - maxSize;
+    for (let i = 0; i < toRemove; i++) {
+      delete cache[keys[i]];
+    }
+  }
+}
+
+// Cachés reactivos inicializados desde localStorage
+const pokemonCache = ref(getFromLocalStorage('pokemon-cache', {}));
+const movesCache = ref(getFromLocalStorage('moves-cache', {}));
+const abilitiesCache = ref(getFromLocalStorage('abilities-cache', {}));
+
+// Observar cambios en los cachés y guardarlos automáticamente
+watch(pokemonCache, (newCache) => {
+  trimCache(newCache);
+  saveToLocalStorage('pokemon-cache', newCache);
+}, { deep: true });
+
+watch(movesCache, (newCache) => {
+  trimCache(newCache);
+  saveToLocalStorage('moves-cache', newCache);
+}, { deep: true });
+
+watch(abilitiesCache, (newCache) => {
+  trimCache(newCache);
+  saveToLocalStorage('abilities-cache', newCache);
+}, { deep: true });
 
 // Cargar Pokémon inicial
 onMounted(() => {
@@ -653,6 +773,23 @@ async function loadPokemon(id) {
   featuredMovesDetails.value = {}; // Limpiar movimientos destacados
 
   try {
+    // Verificar si ya tenemos este Pokémon en caché
+    const cacheKey = id.toString();
+    if (pokemonCache.value[cacheKey]) {
+      console.log(`🎯 Pokémon #${id} cargado desde caché - instantáneo!`);
+      pokemon.value = pokemonCache.value[cacheKey];
+      currentId.value = pokemon.value.id;
+      
+      // Actualizar recientes
+      updateRecentPokemon(pokemon.value);
+      
+      // Cargar movimientos destacados desde caché también
+      featuredMovesDetails.value = await loadFeaturedMovesDetails();
+      loading.value = false;
+      return;
+    }
+
+    console.log(`🌐 Cargando Pokémon #${id} desde API...`);
     const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
 
     if (!response.ok) {
@@ -660,17 +797,16 @@ async function loadPokemon(id) {
     }
 
     const data = await response.json();
+    
+    // Guardar en caché
+    pokemonCache.value[cacheKey] = data;
+    console.log(`💾 Pokémon #${id} guardado en caché`);
+    
     pokemon.value = data;
     currentId.value = data.id;
 
-    // Agregar a recientes (máximo 12)
-    const existing = recentPokemon.value.findIndex((p) => p.id === data.id);
-    if (existing === -1) {
-      recentPokemon.value.unshift(data);
-      if (recentPokemon.value.length > 12) {
-        recentPokemon.value.pop();
-      }
-    }
+    // Actualizar recientes
+    updateRecentPokemon(data);
     
     // Cargar automáticamente los tipos de los movimientos destacados
     featuredMovesDetails.value = await loadFeaturedMovesDetails();
@@ -679,6 +815,21 @@ async function loadPokemon(id) {
     console.error("Error cargando Pokémon:", err);
   } finally {
     loading.value = false;
+  }
+}
+
+// Función auxiliar para actualizar lista de Pokémon recientes
+function updateRecentPokemon(pokemonData) {
+  const existing = recentPokemon.value.findIndex((p) => p.id === pokemonData.id);
+  if (existing === -1) {
+    recentPokemon.value.unshift(pokemonData);
+    if (recentPokemon.value.length > 12) {
+      recentPokemon.value.pop();
+    }
+  } else {
+    // Mover al principio si ya existía
+    recentPokemon.value.splice(existing, 1);
+    recentPokemon.value.unshift(pokemonData);
   }
 }
 
@@ -885,6 +1036,7 @@ async function showMoveDetails(moveName) {
   try {
     // Verificar si ya tenemos los detalles completos en caché
     if (movesCache.value[moveName] && movesCache.value[moveName].description) {
+      console.log(`🎯 Movimiento ${moveName} cargado desde caché - instantáneo!`);
       selectedMove.value = movesCache.value[moveName];
       loadingMoveDetails.value = false;
       return;
@@ -956,6 +1108,8 @@ async function showMoveDetails(moveName) {
     movesCache.value[moveName] = moveDetails;
     selectedMove.value = moveDetails;
     
+    console.log(`💾 Movimiento ${moveName} guardado en caché`);
+    
     // Forzar actualización de la UI para que se muestren los nombres en español
     nextTick(() => {
       // Esto garantiza que las listas se actualicen con los nombres en español
@@ -993,6 +1147,7 @@ async function showAbilityDetails(abilityName) {
   try {
     // Verificar si ya tenemos los detalles completos en caché
     if (abilitiesCache.value[abilityName] && abilitiesCache.value[abilityName].description) {
+      console.log(`🎯 Habilidad ${abilityName} cargada desde caché - instantáneo!`);
       selectedAbility.value = abilitiesCache.value[abilityName];
       loadingAbilityDetails.value = false;
       return;
@@ -1045,6 +1200,8 @@ async function showAbilityDetails(abilityName) {
     abilitiesCache.value[abilityName] = abilityDetails;
     selectedAbility.value = abilityDetails;
     
+    console.log(`💾 Habilidad ${abilityName} guardada en caché`);
+    
   } catch (error) {
     console.error('Error cargando detalles de la habilidad:', error);
     selectedAbility.value = {
@@ -1073,6 +1230,56 @@ async function toggleAllMoves() {
   if (showAllMoves.value) {
     await loadMovesDetails();
   }
+}
+
+// Función para obtener estadísticas del caché
+function getCacheStats() {
+  return {
+    pokemon: Object.keys(pokemonCache.value).length,
+    moves: Object.keys(movesCache.value).length,
+    abilities: Object.keys(abilitiesCache.value).length,
+    total: Object.keys(pokemonCache.value).length + Object.keys(movesCache.value).length + Object.keys(abilitiesCache.value).length
+  };
+}
+
+// Función para limpiar todo el caché
+function clearAllCache() {
+  pokemonCache.value = {};
+  movesCache.value = {};
+  abilitiesCache.value = {};
+  
+  if (process.client) {
+    clearOldCache();
+  }
+  
+  console.log('🧹 Todo el caché ha sido limpiado');
+}
+
+// Función para precargar Pokémon populares
+async function preloadPopularPokemon() {
+  const popularIds = [1, 25, 6, 9, 3, 150, 151, 249, 250, 383, 384, 483, 484, 487, 644, 645, 646, 716, 717, 718];
+  console.log(`🚀 Precargando ${popularIds.length} Pokémon populares...`);
+  
+  loading.value = true;
+  let loaded = 0;
+  
+  for (const id of popularIds) {
+    if (!pokemonCache.value[id.toString()]) {
+      try {
+        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          pokemonCache.value[id.toString()] = data;
+          loaded++;
+        }
+      } catch (error) {
+        console.warn(`Error precargando Pokémon #${id}:`, error);
+      }
+    }
+  }
+  
+  loading.value = false;
+  console.log(`✅ Precargados ${loaded} Pokémon nuevos`);
 }
 
 // Colores para tipos
