@@ -96,15 +96,138 @@
         <div
           class="flex flex-col md:flex-row gap-4 items-center justify-between"
         >
-          <!-- Búsqueda por nombre -->
+          <!-- Búsqueda por nombre con sugerencias predictivas -->
           <div class="flex gap-2">
-            <input
-              v-model="searchTerm"
-              @keyup.enter="searchPokemon"
-              @input="validateSearchInput"
-              placeholder="Buscar Pokémon (ej: pikachu, charizard, 25)"
-              class="px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
+            <div class="relative" ref="searchContainer">
+              <input
+                ref="searchInput"
+                v-model="searchTerm"
+                @keyup.enter="searchPokemon"
+                @keydown="handleSuggestionKeydown"
+                @input="validateSearchInput"
+                @blur="closeSuggestions"
+                @focus="generateSearchSuggestions(searchTerm)"
+                placeholder="Buscar Pokémon (ej: pikachu, charizard, 25)"
+                class="px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent w-80"
+                autocomplete="off"
+              />
+              
+              <!-- Dropdown de sugerencias -->
+              <Teleport to="body">
+                <div 
+                  v-if="showSuggestions && (searchSuggestions.length > 0 || isLoadingSuggestions)"
+                  class="fixed bg-gray-800/98 backdrop-blur-md border border-gray-600/50 rounded-lg shadow-2xl max-h-64 overflow-y-auto"
+                  :style="{
+                    top: dropdownPosition.top + 'px',
+                    left: dropdownPosition.left + 'px',
+                    width: dropdownPosition.width + 'px',
+                    zIndex: 999999
+                  }"
+                >
+                <div class="p-2">
+                  <!-- Indicador de carga -->
+                  <div v-if="isLoadingSuggestions" class="flex items-center justify-center p-3">
+                    <div class="loading loading-spinner loading-sm text-orange-400 mr-2"></div>
+                    <span class="text-sm text-gray-400">Buscando sugerencias...</span>
+                  </div>
+                  
+                  <!-- Sugerencias -->
+                  <div v-else-if="searchSuggestions.length > 0">
+                    <div class="text-xs text-gray-400 mb-2 px-2 flex items-center justify-between">
+                      <span>🔍 Sugerencias ({{ searchSuggestions.length }})</span>
+                      <span class="text-xs text-gray-500">⭐ Popular • 🕒 Reciente • # Número</span>
+                    </div>
+                    <div
+                      v-for="(suggestion, index) in searchSuggestions"
+                      :key="`${suggestion.id}-${suggestion.type}`"
+                      @click="selectSuggestion(suggestion)"
+                      :class="{
+                        'bg-orange-600/80 border-orange-400/50': index === selectedSuggestionIndex,
+                        'bg-gray-700/50 hover:bg-gray-600/50 border-transparent': index !== selectedSuggestionIndex
+                      }"
+                      class="flex items-center gap-3 p-2 rounded cursor-pointer transition-colors border"
+                    >
+                      <!-- Icono según el tipo -->
+                      <div class="flex-shrink-0">
+                        <span 
+                          v-if="suggestion.type === 'local'"
+                          class="text-green-400 text-sm"
+                          title="Pokémon popular"
+                        >⭐</span>
+                        <span 
+                          v-else-if="suggestion.type === 'cached'"
+                          class="text-blue-400 text-sm"
+                          title="Pokémon visitado recientemente"
+                        >🕒</span>
+                        <span 
+                          v-else
+                          class="text-yellow-400 text-sm"
+                          title="Búsqueda por número"
+                        >#</span>
+                      </div>
+                      
+                      <!-- Información del Pokémon -->
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span 
+                            :class="{
+                              'text-orange-100 font-bold': index === selectedSuggestionIndex,
+                              'text-white font-medium': index !== selectedSuggestionIndex
+                            }"
+                            class="transition-colors"
+                          >{{ suggestion.displayName }}</span>
+                          <span 
+                            :class="{
+                              'text-orange-200': index === selectedSuggestionIndex,
+                              'text-gray-400': index !== selectedSuggestionIndex
+                            }"
+                            class="text-xs transition-colors"
+                          >#{{ suggestion.id }}</span>
+                          
+                          <!-- Badge de prioridad para debugging (solo en desarrollo) -->
+                          <span 
+                            v-if="false && suggestion.priority"
+                            class="text-xs bg-red-500/20 text-red-300 px-1 rounded"
+                          >P{{ suggestion.priority }}</span>
+                        </div>
+                        <div 
+                          v-if="suggestion.name !== suggestion.spanishName && suggestion.type !== 'numeric'"
+                          :class="{
+                            'text-orange-300': index === selectedSuggestionIndex,
+                            'text-gray-500': index !== selectedSuggestionIndex
+                          }"
+                          class="text-xs truncate transition-colors"
+                        >
+                          {{ suggestion.name }}
+                        </div>
+                      </div>
+                      
+                      <!-- Indicador de navegación con teclado -->
+                      <div 
+                        v-if="index === selectedSuggestionIndex"
+                        class="text-orange-300 text-xs font-bold"
+                      >
+                        ↵
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Mensaje cuando no hay sugerencias -->
+                  <div v-else class="text-center p-3">
+                    <span class="text-sm text-gray-500">🔍 No se encontraron sugerencias</span>
+                  </div>
+                </div>
+                
+                <!-- Footer con ayuda -->
+                <div class="border-t border-gray-600/50 p-2 bg-gray-900/50">
+                  <div class="text-xs text-gray-500 text-center">
+                    ↑↓ para navegar • ↵ para seleccionar • Esc para cerrar
+                  </div>
+                </div>
+              </div>
+              </Teleport>
+            </div>
+            
             <button
               @click="searchPokemon"
               :disabled="!searchTerm.trim() || loading"
@@ -796,6 +919,14 @@ const selectedAbility = ref(null);
 const showAbilityModal = ref(false);
 const loadingAbilityDetails = ref(false);
 
+// Búsqueda predictiva
+const searchSuggestions = ref([]);
+const showSuggestions = ref(false);
+const selectedSuggestionIndex = ref(-1);
+const isLoadingSuggestions = ref(false);
+const searchDebounceTimer = ref(null);
+const dropdownPosition = ref({ top: 0, left: 0, width: 0 });
+
 // Sistema de caché avanzado
 const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 horas en milisegundos
 const MAX_CACHE_SIZE = 1000; // Máximo número de elementos en caché
@@ -883,9 +1014,220 @@ watch(abilitiesCache, (newCache) => {
   saveToLocalStorage('abilities-cache', newCache);
 }, { deep: true });
 
+// Lista de Pokémon para búsqueda predictiva (principales 151 + populares de otras generaciones)
+const pokemonList = [
+  // Generación 1 - Kanto (los más conocidos)
+  { id: 1, name: 'bulbasaur', spanishName: 'Bulbasaur' },
+  { id: 2, name: 'ivysaur', spanishName: 'Ivysaur' },
+  { id: 3, name: 'venusaur', spanishName: 'Venusaur' },
+  { id: 4, name: 'charmander', spanishName: 'Charmander' },
+  { id: 5, name: 'charmeleon', spanishName: 'Charmeleon' },
+  { id: 6, name: 'charizard', spanishName: 'Charizard' },
+  { id: 7, name: 'squirtle', spanishName: 'Squirtle' },
+  { id: 8, name: 'wartortle', spanishName: 'Wartortle' },
+  { id: 9, name: 'blastoise', spanishName: 'Blastoise' },
+  { id: 10, name: 'caterpie', spanishName: 'Caterpie' },
+  { id: 11, name: 'metapod', spanishName: 'Metapod' },
+  { id: 12, name: 'butterfree', spanishName: 'Butterfree' },
+  { id: 16, name: 'pidgey', spanishName: 'Pidgey' },
+  { id: 19, name: 'rattata', spanishName: 'Rattata' },
+  { id: 25, name: 'pikachu', spanishName: 'Pikachu' },
+  { id: 26, name: 'raichu', spanishName: 'Raichu' },
+  { id: 27, name: 'sandshrew', spanishName: 'Sandshrew' },
+  { id: 29, name: 'nidoran-f', spanishName: 'Nidoran♀' },
+  { id: 32, name: 'nidoran-m', spanishName: 'Nidoran♂' },
+  { id: 35, name: 'clefairy', spanishName: 'Clefairy' },
+  { id: 36, name: 'clefable', spanishName: 'Clefable' },
+  { id: 37, name: 'vulpix', spanishName: 'Vulpix' },
+  { id: 38, name: 'ninetales', spanishName: 'Ninetales' },
+  { id: 39, name: 'jigglypuff', spanishName: 'Jigglypuff' },
+  { id: 40, name: 'wigglytuff', spanishName: 'Wigglytuff' },
+  { id: 41, name: 'zubat', spanishName: 'Zubat' },
+  { id: 42, name: 'golbat', spanishName: 'Golbat' },
+  { id: 43, name: 'oddish', spanishName: 'Oddish' },
+  { id: 50, name: 'diglett', spanishName: 'Diglett' },
+  { id: 52, name: 'meowth', spanishName: 'Meowth' },
+  { id: 53, name: 'persian', spanishName: 'Persian' },
+  { id: 54, name: 'psyduck', spanishName: 'Psyduck' },
+  { id: 55, name: 'golduck', spanishName: 'Golduck' },
+  { id: 56, name: 'mankey', spanishName: 'Mankey' },
+  { id: 58, name: 'growlithe', spanishName: 'Growlithe' },
+  { id: 59, name: 'arcanine', spanishName: 'Arcanine' },
+  { id: 60, name: 'poliwag', spanishName: 'Poliwag' },
+  { id: 63, name: 'abra', spanishName: 'Abra' },
+  { id: 64, name: 'kadabra', spanishName: 'Kadabra' },
+  { id: 65, name: 'alakazam', spanishName: 'Alakazam' },
+  { id: 66, name: 'machop', spanishName: 'Machop' },
+  { id: 67, name: 'machoke', spanishName: 'Machoke' },
+  { id: 68, name: 'machamp', spanishName: 'Machamp' },
+  { id: 72, name: 'tentacool', spanishName: 'Tentacool' },
+  { id: 74, name: 'geodude', spanishName: 'Geodude' },
+  { id: 77, name: 'ponyta', spanishName: 'Ponyta' },
+  { id: 79, name: 'slowpoke', spanishName: 'Slowpoke' },
+  { id: 81, name: 'magnemite', spanishName: 'Magnemite' },
+  { id: 83, name: 'farfetchd', spanishName: 'Farfetch\'d' },
+  { id: 84, name: 'doduo', spanishName: 'Doduo' },
+  { id: 86, name: 'seel', spanishName: 'Seel' },
+  { id: 90, name: 'shellder', spanishName: 'Shellder' },
+  { id: 92, name: 'gastly', spanishName: 'Gastly' },
+  { id: 93, name: 'haunter', spanishName: 'Haunter' },
+  { id: 94, name: 'gengar', spanishName: 'Gengar' },
+  { id: 95, name: 'onix', spanishName: 'Onix' },
+  { id: 96, name: 'drowzee', spanishName: 'Drowzee' },
+  { id: 98, name: 'krabby', spanishName: 'Krabby' },
+  { id: 100, name: 'voltorb', spanishName: 'Voltorb' },
+  { id: 102, name: 'exeggcute', spanishName: 'Exeggcute' },
+  { id: 104, name: 'cubone', spanishName: 'Cubone' },
+  { id: 105, name: 'marowak', spanishName: 'Marowak' },
+  { id: 106, name: 'hitmonlee', spanishName: 'Hitmonlee' },
+  { id: 107, name: 'hitmonchan', spanishName: 'Hitmonchan' },
+  { id: 108, name: 'lickitung', spanishName: 'Lickitung' },
+  { id: 109, name: 'koffing', spanishName: 'Koffing' },
+  { id: 111, name: 'rhyhorn', spanishName: 'Rhyhorn' },
+  { id: 113, name: 'chansey', spanishName: 'Chansey' },
+  { id: 115, name: 'kangaskhan', spanishName: 'Kangaskhan' },
+  { id: 116, name: 'horsea', spanishName: 'Horsea' },
+  { id: 118, name: 'goldeen', spanishName: 'Goldeen' },
+  { id: 120, name: 'staryu', spanishName: 'Staryu' },
+  { id: 121, name: 'starmie', spanishName: 'Starmie' },
+  { id: 122, name: 'mr-mime', spanishName: 'Mr. Mime' },
+  { id: 123, name: 'scyther', spanishName: 'Scyther' },
+  { id: 124, name: 'jynx', spanishName: 'Jynx' },
+  { id: 125, name: 'electabuzz', spanishName: 'Electabuzz' },
+  { id: 126, name: 'magmar', spanishName: 'Magmar' },
+  { id: 127, name: 'pinsir', spanishName: 'Pinsir' },
+  { id: 128, name: 'tauros', spanishName: 'Tauros' },
+  { id: 129, name: 'magikarp', spanishName: 'Magikarp' },
+  { id: 130, name: 'gyarados', spanishName: 'Gyarados' },
+  { id: 131, name: 'lapras', spanishName: 'Lapras' },
+  { id: 132, name: 'ditto', spanishName: 'Ditto' },
+  { id: 133, name: 'eevee', spanishName: 'Eevee' },
+  { id: 134, name: 'vaporeon', spanishName: 'Vaporeon' },
+  { id: 135, name: 'jolteon', spanishName: 'Jolteon' },
+  { id: 136, name: 'flareon', spanishName: 'Flareon' },
+  { id: 137, name: 'porygon', spanishName: 'Porygon' },
+  { id: 138, name: 'omanyte', spanishName: 'Omanyte' },
+  { id: 140, name: 'kabuto', spanishName: 'Kabuto' },
+  { id: 142, name: 'aerodactyl', spanishName: 'Aerodactyl' },
+  { id: 143, name: 'snorlax', spanishName: 'Snorlax' },
+  { id: 144, name: 'articuno', spanishName: 'Articuno' },
+  { id: 145, name: 'zapdos', spanishName: 'Zapdos' },
+  { id: 146, name: 'moltres', spanishName: 'Moltres' },
+  { id: 147, name: 'dratini', spanishName: 'Dratini' },
+  { id: 148, name: 'dragonair', spanishName: 'Dragonair' },
+  { id: 149, name: 'dragonite', spanishName: 'Dragonite' },
+  { id: 150, name: 'mewtwo', spanishName: 'Mewtwo' },
+  { id: 151, name: 'mew', spanishName: 'Mew' },
+  
+  // Generación 2 - Johto (más populares)
+  { id: 152, name: 'chikorita', spanishName: 'Chikorita' },
+  { id: 155, name: 'cyndaquil', spanishName: 'Cyndaquil' },
+  { id: 158, name: 'totodile', spanishName: 'Totodile' },
+  { id: 169, name: 'crobat', spanishName: 'Crobat' },
+  { id: 172, name: 'pichu', spanishName: 'Pichu' },
+  { id: 179, name: 'mareep', spanishName: 'Mareep' },
+  { id: 183, name: 'marill', spanishName: 'Marill' },
+  { id: 190, name: 'aipom', spanishName: 'Aipom' },
+  { id: 194, name: 'wooper', spanishName: 'Wooper' },
+  { id: 196, name: 'espeon', spanishName: 'Espeon' },
+  { id: 197, name: 'umbreon', spanishName: 'Umbreon' },
+  { id: 208, name: 'steelix', spanishName: 'Steelix' },
+  { id: 215, name: 'sneasel', spanishName: 'Sneasel' },
+  { id: 220, name: 'swinub', spanishName: 'Swinub' },
+  { id: 236, name: 'tyrogue', spanishName: 'Tyrogue' },
+  { id: 243, name: 'raikou', spanishName: 'Raikou' },
+  { id: 244, name: 'entei', spanishName: 'Entei' },
+  { id: 245, name: 'suicune', spanishName: 'Suicune' },
+  { id: 246, name: 'larvitar', spanishName: 'Larvitar' },
+  { id: 248, name: 'tyranitar', spanishName: 'Tyranitar' },
+  { id: 249, name: 'lugia', spanishName: 'Lugia' },
+  { id: 250, name: 'ho-oh', spanishName: 'Ho-Oh' },
+  { id: 251, name: 'celebi', spanishName: 'Celebi' },
+  
+  // Generación 3 - Hoenn (más populares)
+  { id: 252, name: 'treecko', spanishName: 'Treecko' },
+  { id: 255, name: 'torchic', spanishName: 'Torchic' },
+  { id: 258, name: 'mudkip', spanishName: 'Mudkip' },
+  { id: 280, name: 'ralts', spanishName: 'Ralts' },
+  { id: 282, name: 'gardevoir', spanishName: 'Gardevoir' },
+  { id: 302, name: 'sableye', spanishName: 'Sableye' },
+  { id: 303, name: 'mawile', spanishName: 'Mawile' },
+  { id: 304, name: 'aron', spanishName: 'Aron' },
+  { id: 306, name: 'aggron', spanishName: 'Aggron' },
+  { id: 333, name: 'swablu', spanishName: 'Swablu' },
+  { id: 334, name: 'altaria', spanishName: 'Altaria' },
+  { id: 355, name: 'duskull', spanishName: 'Duskull' },
+  { id: 371, name: 'bagon', spanishName: 'Bagon' },
+  { id: 373, name: 'salamence', spanishName: 'Salamence' },
+  { id: 374, name: 'beldum', spanishName: 'Beldum' },
+  { id: 376, name: 'metagross', spanishName: 'Metagross' },
+  { id: 380, name: 'latias', spanishName: 'Latias' },
+  { id: 381, name: 'latios', spanishName: 'Latios' },
+  { id: 382, name: 'kyogre', spanishName: 'Kyogre' },
+  { id: 383, name: 'groudon', spanishName: 'Groudon' },
+  { id: 384, name: 'rayquaza', spanishName: 'Rayquaza' },
+  
+  // Generación 4 - Sinnoh (más populares)
+  { id: 387, name: 'turtwig', spanishName: 'Turtwig' },
+  { id: 390, name: 'chimchar', spanishName: 'Chimchar' },
+  { id: 393, name: 'piplup', spanishName: 'Piplup' },
+  { id: 447, name: 'riolu', spanishName: 'Riolu' },
+  { id: 448, name: 'lucario', spanishName: 'Lucario' },
+  { id: 470, name: 'leafeon', spanishName: 'Leafeon' },
+  { id: 471, name: 'glaceon', spanishName: 'Glaceon' },
+  { id: 483, name: 'dialga', spanishName: 'Dialga' },
+  { id: 484, name: 'palkia', spanishName: 'Palkia' },
+  { id: 487, name: 'giratina', spanishName: 'Giratina' },
+  { id: 493, name: 'arceus', spanishName: 'Arceus' },
+  
+  // Generación 5 - Unova (más populares)
+  { id: 501, name: 'oshawott', spanishName: 'Oshawott' },
+  { id: 570, name: 'zorua', spanishName: 'Zorua' },
+  { id: 571, name: 'zoroark', spanishName: 'Zoroark' },
+  
+  // Generación 6 - Kalos (más populares)
+  { id: 650, name: 'chespin', spanishName: 'Chespin' },
+  { id: 653, name: 'fennekin', spanishName: 'Fennekin' },
+  { id: 656, name: 'froakie', spanishName: 'Froakie' },
+  { id: 658, name: 'greninja', spanishName: 'Greninja' },
+  { id: 700, name: 'sylveon', spanishName: 'Sylveon' },
+  
+  // Generación 7 - Alola (más populares)
+  { id: 722, name: 'rowlet', spanishName: 'Rowlet' },
+  { id: 725, name: 'litten', spanishName: 'Litten' },
+  { id: 728, name: 'popplio', spanishName: 'Popplio' },
+  
+  // Generación 8 - Galar (más populares)
+  { id: 810, name: 'grookey', spanishName: 'Grookey' },
+  { id: 813, name: 'scorbunny', spanishName: 'Scorbunny' },
+  { id: 816, name: 'sobble', spanishName: 'Sobble' },
+  
+  // Generación 9 - Paldea (más populares)
+  { id: 906, name: 'sprigatito', spanishName: 'Sprigatito' },
+  { id: 909, name: 'fuecoco', spanishName: 'Fuecoco' },
+  { id: 912, name: 'quaxly', spanishName: 'Quaxly' }
+];
+
+// Cache para búsqueda predictiva
+const suggestionCache = ref(getFromLocalStorage('suggestions-cache', {}));
+const recentSearches = ref(getFromLocalStorage('recent-searches', []));
+
 // Cargar Pokémon inicial
 onMounted(() => {
   loadPokemon(1);
+});
+
+// Limpiar timers y listeners al desmontar el componente
+onUnmounted(() => {
+  if (searchDebounceTimer.value) {
+    clearTimeout(searchDebounceTimer.value);
+  }
+  
+  // Limpiar listeners de scroll
+  if (process.client) {
+    window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener('resize', handleScroll);
+  }
 });
 
 // Función principal para cargar Pokémon
@@ -1007,29 +1349,8 @@ async function updateRecentPokemon(pokemonData) {
 
 // Función para validar input en tiempo real
 function validateSearchInput(event) {
-  const inputValue = event.target.value;
-  
-  // Filtrar caracteres no válidos (solo letras, números, espacios y guiones)
-  const cleanValue = inputValue.replace(/[^a-zA-Z0-9\s\-'\.]/g, '');
-  
-  // Si el valor cambió, actualizar el input
-  if (cleanValue !== inputValue) {
-    searchTerm.value = cleanValue;
-    error.value = "Se eliminaron caracteres especiales no permitidos";
-    
-    // Limpiar el mensaje de error después de 3 segundos
-    setTimeout(() => {
-      if (error.value === "Se eliminaron caracteres especiales no permitidos") {
-        error.value = "";
-      }
-    }, 3000);
-  } else {
-    // Limpiar error si el texto es válido
-    if (error.value === "Se eliminaron caracteres especiales no permitidos" || 
-        error.value === "Solo se permiten letras, números y espacios en la búsqueda") {
-      error.value = "";
-    }
-  }
+  // Usar la nueva función que incluye búsqueda predictiva
+  validateSearchInputWithSuggestions(event);
 }
 
 // Función para validar texto de búsqueda
@@ -1066,6 +1387,10 @@ async function searchPokemon() {
   }
   
   try {
+    // Ocultar sugerencias al buscar
+    showSuggestions.value = false;
+    selectedSuggestionIndex.value = -1;
+    
     await loadPokemon(term);
     // No limpiar el término de búsqueda para permitir búsquedas similares
   } catch (err) {
@@ -1134,6 +1459,293 @@ function previousPokemon() {
     loadPokemon(currentId.value - 1);
   }
 }
+
+// ======= FUNCIONES DE BÚSQUEDA PREDICTIVA =======
+
+// Función para generar sugerencias de búsqueda mejorada
+async function generateSearchSuggestions(searchTerm) {
+  if (!searchTerm || searchTerm.length < 1) {
+    searchSuggestions.value = [];
+    showSuggestions.value = false;
+    return;
+  }
+
+  isLoadingSuggestions.value = true;
+  const term = searchTerm.toLowerCase().trim();
+  const suggestions = new Map(); // Usar Map para evitar duplicados por ID
+
+  try {
+    // 1. Buscar en la lista local primero (más rápido)
+    const localMatches = pokemonList.filter(pokemon => {
+      const nameMatch = pokemon.name.toLowerCase().includes(term);
+      const spanishNameMatch = pokemon.spanishName.toLowerCase().includes(term);
+      const idMatch = pokemon.id.toString() === term;
+      return nameMatch || spanishNameMatch || idMatch;
+    });
+
+    // Agregar coincidencias locales con prioridad alta
+    localMatches.forEach(pokemon => {
+      if (!suggestions.has(pokemon.id)) {
+        suggestions.set(pokemon.id, {
+          id: pokemon.id,
+          name: pokemon.name,
+          spanishName: pokemon.spanishName,
+          displayName: pokemon.spanishName,
+          type: 'local',
+          priority: getSearchPriority(pokemon, term)
+        });
+      }
+    });
+
+    // 2. Buscar en caché de Pokémon visitados
+    Object.values(pokemonCache.value).forEach(pokemon => {
+      if (pokemon && pokemon.id && !suggestions.has(pokemon.id)) {
+        const nameMatch = pokemon.name?.toLowerCase().includes(term);
+        const spanishNameMatch = pokemon.spanishName?.toLowerCase().includes(term);
+        const idMatch = pokemon.id.toString() === term;
+        
+        if (nameMatch || spanishNameMatch || idMatch) {
+          suggestions.set(pokemon.id, {
+            id: pokemon.id,
+            name: pokemon.name,
+            spanishName: pokemon.spanishName || pokemon.name,
+            displayName: pokemon.spanishName || pokemon.name,
+            type: 'cached',
+            priority: getSearchPriority(pokemon, term)
+          });
+        }
+      }
+    });
+
+    // 3. Si es un número válido, agregarlo como sugerencia directa
+    const numericId = parseInt(term);
+    if (!isNaN(numericId) && numericId > 0 && numericId <= 1025) {
+      if (!suggestions.has(numericId)) {
+        suggestions.set(numericId, {
+          id: numericId,
+          name: `pokemon-${numericId}`,
+          spanishName: `Pokémon #${numericId}`,
+          displayName: `Pokémon #${numericId}`,
+          type: 'numeric',
+          priority: 50 // Prioridad media para búsquedas numéricas
+        });
+      }
+    }
+
+    // Convertir Map a Array y ordenar por relevancia
+    const sortedSuggestions = Array.from(suggestions.values())
+      .sort((a, b) => {
+        // Primero por prioridad (menor valor = mayor prioridad)
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
+        }
+        
+        // Luego por tipo: local > cached > numeric
+        const typeOrder = { local: 0, cached: 1, numeric: 2 };
+        return typeOrder[a.type] - typeOrder[b.type];
+      })
+      .slice(0, 10); // Aumentar a 10 sugerencias para mejor experiencia
+
+    searchSuggestions.value = sortedSuggestions;
+    showSuggestions.value = sortedSuggestions.length > 0;
+    selectedSuggestionIndex.value = -1;
+    
+    // Actualizar posición del dropdown cuando se muestran sugerencias
+    if (sortedSuggestions.length > 0) {
+      nextTick(() => {
+        updateDropdownPosition();
+      });
+    }
+
+    console.log(`🔍 Generadas ${sortedSuggestions.length} sugerencias para "${term}"`);
+
+  } catch (error) {
+    console.error('Error generando sugerencias:', error);
+    searchSuggestions.value = [];
+    showSuggestions.value = false;
+  } finally {
+    isLoadingSuggestions.value = false;
+  }
+}
+
+// Función auxiliar para calcular prioridad de búsqueda
+function getSearchPriority(pokemon, term) {
+  const nameMatch = pokemon.name?.toLowerCase() || '';
+  const spanishNameMatch = pokemon.spanishName?.toLowerCase() || '';
+  const idMatch = pokemon.id?.toString() || '';
+  
+  // Coincidencia exacta = máxima prioridad
+  if (nameMatch === term || spanishNameMatch === term || idMatch === term) {
+    return 1;
+  }
+  
+  // Comienza con el término = alta prioridad
+  if (nameMatch.startsWith(term) || spanishNameMatch.startsWith(term)) {
+    return 2;
+  }
+  
+  // Contiene el término = prioridad media
+  if (nameMatch.includes(term) || spanishNameMatch.includes(term)) {
+    return 10;
+  }
+  
+  // Por defecto = baja prioridad
+  return 20;
+}
+
+// Función mejorada de validación que incluye búsqueda predictiva con debouncing
+function validateSearchInputWithSuggestions(event) {
+  const inputValue = event.target.value;
+  
+  // Filtrar caracteres no válidos (solo letras, números, espacios y guiones)
+  const cleanValue = inputValue.replace(/[^a-zA-Z0-9\s\-'\.]/g, '');
+  
+  // Si el valor cambió, actualizar el input
+  if (cleanValue !== inputValue) {
+    searchTerm.value = cleanValue;
+    error.value = "Se eliminaron caracteres especiales no permitidos";
+    
+    // Limpiar el mensaje de error después de 3 segundos
+    setTimeout(() => {
+      if (error.value === "Se eliminaron caracteres especiales no permitidos") {
+        error.value = "";
+      }
+    }, 3000);
+  } else {
+    // Limpiar error si el texto es válido
+    if (error.value === "Se eliminaron caracteres especiales no permitidos" || 
+        error.value === "Solo se permiten letras, números y espacios en la búsqueda") {
+      error.value = "";
+    }
+  }
+  
+  // Limpiar timer anterior si existe
+  if (searchDebounceTimer.value) {
+    clearTimeout(searchDebounceTimer.value);
+  }
+  
+  // Generar sugerencias con debouncing (300ms de retraso)
+  searchDebounceTimer.value = setTimeout(() => {
+    generateSearchSuggestions(cleanValue);
+  }, 150); // Reducido a 150ms para mejor experiencia de usuario
+}
+
+// Función para seleccionar una sugerencia
+function selectSuggestion(suggestion) {
+  searchTerm.value = suggestion.spanishName;
+  showSuggestions.value = false;
+  selectedSuggestionIndex.value = -1;
+  
+  // Guardar en búsquedas recientes
+  addToRecentSearches(suggestion);
+  
+  loadPokemon(suggestion.id);
+}
+
+// Función para agregar a búsquedas recientes
+function addToRecentSearches(suggestion) {
+  // Remover si ya existe
+  const existingIndex = recentSearches.value.findIndex(s => s.id === suggestion.id);
+  if (existingIndex >= 0) {
+    recentSearches.value.splice(existingIndex, 1);
+  }
+  
+  // Agregar al principio
+  recentSearches.value.unshift({
+    id: suggestion.id,
+    name: suggestion.name,
+    spanishName: suggestion.spanishName,
+    displayName: suggestion.displayName,
+    timestamp: Date.now()
+  });
+  
+  // Mantener solo los últimos 20
+  if (recentSearches.value.length > 20) {
+    recentSearches.value = recentSearches.value.slice(0, 20);
+  }
+  
+  // Guardar en localStorage
+  saveToLocalStorage('recent-searches', recentSearches.value);
+}
+
+// Función para calcular la posición del dropdown
+function updateDropdownPosition() {
+  if (process.client) {
+    const searchInput = document.querySelector('input[placeholder*="Buscar Pokémon"]');
+    if (searchInput) {
+      const rect = searchInput.getBoundingClientRect();
+      dropdownPosition.value = {
+        top: rect.bottom + 4, // Sin window.scrollY para position fixed
+        left: rect.left,      // Sin window.scrollX para position fixed
+        width: rect.width
+      };
+    }
+  }
+}
+
+// Agregar listener de scroll para actualizar posición
+function handleScroll() {
+  if (showSuggestions.value) {
+    updateDropdownPosition();
+  }
+}
+
+// Agregar/quitar listeners de scroll
+watch(showSuggestions, (newValue) => {
+  if (process.client) {
+    if (newValue) {
+      window.addEventListener('scroll', handleScroll);
+      window.addEventListener('resize', handleScroll);
+    } else {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    }
+  }
+});
+
+// Función para manejar navegación con teclado en sugerencias
+function handleSuggestionKeydown(event) {
+  if (!showSuggestions.value || searchSuggestions.value.length === 0) return;
+  
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      selectedSuggestionIndex.value = Math.min(
+        selectedSuggestionIndex.value + 1,
+        searchSuggestions.value.length - 1
+      );
+      break;
+      
+    case 'ArrowUp':
+      event.preventDefault();
+      selectedSuggestionIndex.value = Math.max(selectedSuggestionIndex.value - 1, -1);
+      break;
+      
+    case 'Enter':
+      event.preventDefault();
+      if (selectedSuggestionIndex.value >= 0) {
+        selectSuggestion(searchSuggestions.value[selectedSuggestionIndex.value]);
+      } else {
+        searchPokemon();
+      }
+      break;
+      
+    case 'Escape':
+      showSuggestions.value = false;
+      selectedSuggestionIndex.value = -1;
+      break;
+  }
+}
+
+// Función para cerrar sugerencias al hacer clic fuera
+function closeSuggestions() {
+  setTimeout(() => {
+    showSuggestions.value = false;
+    selectedSuggestionIndex.value = -1;
+  }, 150); // Pequeño delay para permitir clics en sugerencias
+}
+
+// ======= FIN FUNCIONES DE BÚSQUEDA PREDICTIVA =======
 
 // Cargar detalles de movimientos destacados (primeros 8)
 async function loadFeaturedMovesDetails() {
