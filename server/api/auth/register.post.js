@@ -87,7 +87,13 @@ export default defineEventHandler(async (event) => {
     }
 
   } catch (error) {
-    console.error('Error en registro:', error)
+    console.error('❌ Error completo en registro:', error)
+    console.error('📊 Detalles del error:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    })
     
     if (error.statusCode) {
       throw error
@@ -95,7 +101,7 @@ export default defineEventHandler(async (event) => {
 
     throw createError({
       statusCode: 500,
-      statusMessage: 'Error interno del servidor'
+      statusMessage: 'Error interno del servidor: ' + error.message
     })
   }
 })

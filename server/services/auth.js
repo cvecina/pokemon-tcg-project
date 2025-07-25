@@ -2,7 +2,17 @@ import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
-const prisma = new PrismaClient()
+// Inicializar Prisma con configuración específica para desarrollo
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'],
+})
+
+// Manejar cierre de la conexión
+process.on('beforeExit', async () => {
+  await prisma.$disconnect()
+})
+
+console.log('🔌 Prisma Client inicializado en auth service')
 
 // Servicio de autenticación
 export class AuthService {
