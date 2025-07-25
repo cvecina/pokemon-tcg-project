@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Auth API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #1a1a1a; color: white; }
+        .form { background: #333; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        input, button { display: block; margin: 10px 0; padding: 10px; width: 300px; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        .result { background: #222; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #d32f2f; }
+        .success { background: #388e3c; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Test Auth API</h1>
+    
+    <div class="form">
+        <h2>Registro</h2>
+        <input type="email" id="reg-email" placeholder="Email" value="test2@example.com">
+        <input type="text" id="reg-username" placeholder="Username" value="testuser2">
+        <input type="password" id="reg-password" placeholder="Password" value="password123">
+        <input type="password" id="reg-confirm" placeholder="Confirm Password" value="password123">
+        <button onclick="testRegister()">Registrar</button>
+        <div id="reg-result" class="result"></div>
+    </div>
+    
+    <div class="form">
+        <h2>Login</h2>
+        <input type="text" id="login-user" placeholder="Email o Username" value="test2@example.com">
+        <input type="password" id="login-pass" placeholder="Password" value="password123">
+        <button onclick="testLogin()">Login</button>
+        <div id="login-result" class="result"></div>
+    </div>
+
+    <script>
+        async function testRegister() {
+            const resultDiv = document.getElementById('reg-result');
+            resultDiv.textContent = 'Enviando...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: document.getElementById('reg-email').value,
+                        username: document.getElementById('reg-username').value,
+                        password: document.getElementById('reg-password').value,
+                        confirmPassword: document.getElementById('reg-confirm').value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = '✅ ' + JSON.stringify(result, null, 2);
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = '❌ ' + JSON.stringify(result, null, 2);
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = '💥 Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.textContent = 'Enviando...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        emailOrUsername: document.getElementById('login-user').value,
+                        password: document.getElementById('login-pass').value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = '✅ ' + JSON.stringify(result, null, 2);
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = '❌ ' + JSON.stringify(result, null, 2);
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = '💥 Error: ' + error.message;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html>

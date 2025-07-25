@@ -186,6 +186,14 @@ async function handleSubmit() {
   loading.value = true
 
   try {
+    console.log('🔄 Iniciando', isLogin.value ? 'login' : 'registro')
+    console.log('📝 Datos del formulario:', { 
+      email: form.email, 
+      username: form.username, 
+      password: '***',
+      confirmPassword: isLogin.value ? 'N/A' : '***'
+    })
+
     // Validaciones frontend
     if (!isLogin.value) {
       if (form.password !== form.confirmPassword) {
@@ -205,9 +213,11 @@ async function handleSubmit() {
 
     if (isLogin.value) {
       // Login
+      console.log('🔐 Intentando login...')
       result = await authStore.login(form.username, form.password)
     } else {
       // Registro
+      console.log('👤 Intentando registro...')
       result = await authStore.register(
         form.email,
         form.username,
@@ -216,8 +226,11 @@ async function handleSubmit() {
       )
     }
 
+    console.log('📨 Resultado:', result)
+
     if (result.success) {
       success.value = result.message
+      console.log('✅ Éxito! Redirigiendo...')
       
       // Redireccionar después de 1 segundo
       setTimeout(() => {
@@ -225,10 +238,18 @@ async function handleSubmit() {
       }, 1000)
     } else {
       error.value = result.message
+      console.error('❌ Error del servidor:', result.message)
     }
   } catch (err) {
-    error.value = 'Error de conexión. Intenta de nuevo.'
-    console.error('Error en formulario:', err)
+    console.error('💥 Error crítico en formulario:', err)
+    console.error('📊 Detalles del error:', {
+      message: err.message,
+      statusCode: err.statusCode,
+      statusMessage: err.statusMessage,
+      data: err.data
+    })
+    
+    error.value = err.statusMessage || err.message || 'Error de conexión. Intenta de nuevo.'
   } finally {
     loading.value = false
   }
