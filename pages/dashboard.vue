@@ -32,9 +32,16 @@
               <span>🎲</span>
               <span>Mis Mazos</span>
             </NuxtLink>
-          </div>
-
-          <!-- Usuario -->
+            <a 
+              href="https://discord.gg/aKxPPuEFnH" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
+            >
+              <span>💬</span>
+              <span>Discord</span>
+            </a>
+          </div>          <!-- Usuario -->
           <div class="flex items-center space-x-4">
             <span class="text-sm text-white/80 hidden sm:block">
               Hola, <span class="font-medium text-white">{{ authStore.user?.username }}</span>

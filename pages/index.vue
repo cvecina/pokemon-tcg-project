@@ -37,6 +37,15 @@
               <span>🎲</span>
               <span>Mis Mazos</span>
             </NuxtLink>
+            <a 
+              href="https://discord.gg/aKxPPuEFnH" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
+            >
+              <span>💬</span>
+              <span>Discord</span>
+            </a>
           </div>
 
           <!-- Usuario/Auth -->
@@ -165,10 +174,19 @@
         <div class="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center">
           <div class="text-4xl mb-4">👥</div>
           <h3 class="text-xl font-bold text-white mb-2">Comunidad</h3>
-          <p class="text-white/80">
+          <p class="text-white/80 mb-4">
             Comparte tus cartas con otros usuarios y contribuye a crear la base
             de datos más completa.
           </p>
+          <a 
+            href="https://discord.gg/aKxPPuEFnH" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            <span>💬</span>
+            <span>Únete a Discord</span>
+          </a>
         </div>
       </div>
 
@@ -251,8 +269,21 @@
     <!-- Footer -->
     <footer class="border-t border-white/20 mt-16">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="text-center text-white/60">
-          <p>&copy; 2024 TCG Manager. Hecho con ❤️ para la comunidad TCG.</p>
+        <div class="text-center">
+          <div class="mb-4">
+            <a 
+              href="https://discord.gg/aKxPPuEFnH" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              <span>💬</span>
+              <span>Únete a nuestra comunidad en Discord</span>
+            </a>
+          </div>
+          <div class="text-white/60">
+            <p>&copy; 2024 TCG Manager. Hecho con ❤️ para la comunidad TCG.</p>
+          </div>
         </div>
       </div>
     </footer>

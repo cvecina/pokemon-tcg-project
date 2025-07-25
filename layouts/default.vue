@@ -12,7 +12,7 @@
     <Toast />
     
     <!-- Footer -->
-    <Footer />
+    <!-- <Footer /> -->
   </div>
 </template>
 
