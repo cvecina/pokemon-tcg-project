@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-orange-900 via-red-900 to-pink-900">
+  <div class="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
     <!-- Header -->
     <header class="relative z-10">
       <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,12 +21,6 @@
             <NuxtLink to="/dashboard" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
               Dashboard
             </NuxtLink>
-            <button 
-              @click="authStore.logout()"
-              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Cerrar Sesión
-            </button>
           </div>
         </div>
       </nav>

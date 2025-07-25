@@ -3,6 +3,17 @@ import { NuxtLoadingIndicator } from './.nuxt/components.d';
 export default defineNuxtConfig({
   ssr: false,
 
+  // Runtime config for environment variables
+  runtimeConfig: {
+    // Private keys (only available on server-side)
+    pokemonTcgApiKey: process.env.NUXT_POKEMON_TCG_API_KEY,
+    
+    // Public keys (exposed to client-side)
+    public: {
+      pokemonTcgApiKey: process.env.NUXT_POKEMON_TCG_API_KEY
+    }
+  },
+
   router: {
     options: {
       hashMode: false

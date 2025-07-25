@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import PokemonTCG from 'pokemon-tcg-sdk-typescript'
 
 export const useCardsStore = defineStore('cards', {
   state: () => ({
@@ -34,7 +33,8 @@ export const useCardsStore = defineStore('cards', {
     async loadSets() {
       try {
         this.loading = true
-        const response = await PokemonTCG.Set.all()
+        const { getAllSets } = usePokemonTCG()
+        const response = await getAllSets()
         this.sets = response.sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))
       } catch (error) {
         console.error('Error loading sets:', error)
@@ -47,7 +47,8 @@ export const useCardsStore = defineStore('cards', {
     // Cargar tipos disponibles
     async loadTypes() {
       try {
-        const response = await PokemonTCG.Type.all()
+        const { getAllTypes } = usePokemonTCG()
+        const response = await getAllTypes()
         this.types = response
       } catch (error) {
         console.error('Error loading types:', error)
@@ -57,7 +58,8 @@ export const useCardsStore = defineStore('cards', {
     // Cargar rarezas disponibles
     async loadRarities() {
       try {
-        const response = await PokemonTCG.Rarity.all()
+        const { getAllRarities } = usePokemonTCG()
+        const response = await getAllRarities()
         this.rarities = response
       } catch (error) {
         console.error('Error loading rarities:', error)
@@ -97,7 +99,8 @@ export const useCardsStore = defineStore('cards', {
         const query = queryParts.join(' ')
         this.lastQuery = query
         
-        const response = await PokemonTCG.Card.where({
+        const { searchCards } = usePokemonTCG()
+        const response = await searchCards({
           q: query,
           page: page,
           pageSize: this.pageSize
@@ -122,7 +125,8 @@ export const useCardsStore = defineStore('cards', {
         this.loading = true
         this.error = null
         
-        const response = await PokemonTCG.Card.where({
+        const { searchCards } = usePokemonTCG()
+        const response = await searchCards({
           pageSize: count,
           page: Math.floor(Math.random() * 100) + 1
         })

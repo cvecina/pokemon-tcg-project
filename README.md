@@ -1,11 +1,104 @@
-# Nuxt Template
+# 🃏 PokéDeck Master
 
-Nuxt Template es una estructura para crear aplicaciones web de manera ágil que utiliza varias tecnologías y trae diferentes funcionalidades pre-diseñadas.
+**La herramienta definitiva para construir y gestionar tus mazos de Pokémon TCG**
 
-## Características
-- **Componentes default**: El programa viene preparado con un login, registro, cambio de contraseña y con varios componentes útiles como tablas, formularios, buscadores...
+Una aplicación web moderna construida con Nuxt 3 que te permite crear, gestionar y analizar tus mazos de Pokémon Trading Card Game con acceso a la base de datos oficial.
 
-## Ejemplo de uso Formulario dinámico
+## ⚡ Características Principales
+
+- **🎲 Gestión de Mazos**: Crea, edita, duplica y organiza tus mazos
+- **🔍 Búsqueda de Cartas**: Acceso completo a la API oficial de Pokémon TCG  
+- **📊 Estadísticas Avanzadas**: Análisis de tipos, rareza y distribución de cartas
+- **🌙 Modo Oscuro**: Cambia entre tema claro y oscuro
+- **📱 Responsive**: Funciona perfectamente en móvil y desktop
+- **💾 Persistencia Local**: Guarda tus mazos localmente sin necesidad de servidor
+- **🎯 Validación de Mazos**: Verifica que cumplan las reglas del formato
+
+## 🚀 Instalación Rápida
+
+```bash
+# Clona el repositorio
+git clone [tu-repo]
+cd pokemon-tcg-project
+
+# Instala las dependencias
+pnpm install
+
+# Configura las variables de entorno
+cp .env.example .env
+# Edita .env y agrega tu API key de Pokemon TCG
+
+# Inicia el servidor de desarrollo
+pnpm dev
+```
+
+## 🔑 Configuración de API Key
+
+1. **Obtén tu API key gratuita** en [Pokemon TCG Developer Portal](https://dev.pokemontcg.io/)
+2. **Copia el archivo de ejemplo**: `cp .env.example .env`
+3. **Edita el archivo `.env`** y agrega tu API key:
+
+```env
+POKEMON_TCG_API_KEY=tu_api_key_aqui
+NUXT_POKEMON_TCG_API_KEY=tu_api_key_aqui
+```
+
+> ⚠️ **Importante**: Nunca compartas tu API key públicamente. El archivo `.env` está en `.gitignore` para proteger tus credenciales.
+
+## 🛠️ Tecnologías Utilizadas
+
+- **[Nuxt 3](https://nuxt.com/)** - Framework Vue.js con SSR
+- **[Tailwind CSS](https://tailwindcss.com/)** + **[DaisyUI](https://daisyui.com/)** - Estilos y componentes
+- **[Pinia](https://pinia.vuejs.org/)** - Gestión de estado
+- **[Pokemon TCG SDK](https://github.com/PokemonTCG/pokemon-tcg-sdk-typescript)** - API oficial de Pokémon
+- **[TypeScript](https://www.typescriptlang.org/)** - Tipado estático
+- **[Vue 3](https://vuejs.org/)** - Framework reactivo
+
+## 📖 Estructura del Proyecto
+
+```
+├── components/          # Componentes reutilizables
+│   ├── Header.vue      # Navegación principal
+│   ├── CardDetailModal.vue
+│   ├── CardSearchModal.vue
+│   └── DeckFormModal.vue
+├── pages/              # Páginas de la aplicación
+│   ├── index.vue       # Página principal
+│   ├── test-cards.vue  # Vista de cartas Pokémon
+│   ├── cards/          # Explorador de cartas
+│   └── decks/          # Gestión de mazos
+├── stores/             # Stores de Pinia
+│   ├── cards.store.js  # Gestión de cartas y API
+│   ├── decks.store.js  # Gestión de mazos
+│   └── alert.store.js  # Sistema de notificaciones
+└── assets/             # Recursos estáticos
+```
+
+## 🎮 Cómo Usar
+
+### 1. **Explorar Cartas**
+- Ve a `/test-cards` para buscar cartas de Pokémon
+- Usa la búsqueda o los botones rápidos  
+- Haz clic en cualquier carta para ver detalles
+
+### 2. **Crear un Mazo**
+- Ve a `/decks` y haz clic en "Nuevo Mazo"
+- Llena los datos básicos (nombre, formato, descripción)
+- Agrega cartas usando el modal de búsqueda
+
+### 3. **Gestionar Mazos**
+- Edita, duplica o elimina mazos existentes
+- Ve estadísticas detalladas por mazo
+- Exporta mazos en formato JSON
+
+## 🧪 Páginas de Desarrollo
+
+- **`/`** - Página principal con estadísticas
+- **`/decks`** - Gestión completa de mazos  
+- **`/cards`** - Explorador avanzado con filtros
+- **`/test-cards`** - Vista simplificada para probar la API
+
+## 📝 Scripts Disponibles
 Hay props obligatorios:
 - titulo
 - datos

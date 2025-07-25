@@ -12,6 +12,11 @@
           <li><NuxtLink to="/">🏠 Inicio</NuxtLink></li>
           <li><NuxtLink to="/decks">🎲 Mis Mazos</NuxtLink></li>
           <li><NuxtLink to="/cards">🔍 Explorar Cartas</NuxtLink></li>
+          <li><NuxtLink to="/tcg-real" class="text-yellow-500 font-bold">🃏 TCG REAL CARDS</NuxtLink></li>
+          <li><NuxtLink to="/pokemon-real" class="text-red-500 font-bold">🔥 POKÉDEX REAL</NuxtLink></li>
+          <li><NuxtLink to="/cards-working" class="text-success font-bold">✅ API que FUNCIONA</NuxtLink></li>
+          <li><NuxtLink to="/test-cards">🃏 Ver Cartas (TS)</NuxtLink></li>
+          <li><NuxtLink to="/test-js-sdk">⚡ Ver Cartas (JS)</NuxtLink></li>
         </ul>
       </div>
       
@@ -28,6 +33,18 @@
         <li><NuxtLink to="/" class="text-base">🏠 Inicio</NuxtLink></li>
         <li><NuxtLink to="/decks" class="text-base">🎲 Mis Mazos</NuxtLink></li>
         <li><NuxtLink to="/cards" class="text-base">🔍 Explorar Cartas</NuxtLink></li>
+        <li><NuxtLink to="/tcg-real" class="text-base text-yellow-500 font-bold">🃏 TCG REAL</NuxtLink></li>
+        <li><NuxtLink to="/pokemon-real" class="text-base text-red-500 font-bold">🔥 POKÉDEX REAL</NuxtLink></li>
+        <li>
+          <details>
+            <summary class="text-base">🃏 Ver Cartas</summary>
+            <ul class="p-2 bg-base-100 rounded-t-none">
+              <li><NuxtLink to="/cards-working" class="text-success font-bold">✅ API Funcional</NuxtLink></li>
+              <li><NuxtLink to="/test-cards">TypeScript SDK</NuxtLink></li>
+              <li><NuxtLink to="/test-js-sdk">JavaScript SDK</NuxtLink></li>
+            </ul>
+          </details>
+        </li>
       </ul>
     </div>
     

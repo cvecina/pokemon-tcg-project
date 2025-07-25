@@ -1,0 +1,148 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Usuario para autenticación
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relaciones
+  createdCards Card[]  @relation("CardCreator")
+  decks        Deck[]
+  deckCards    DeckCard[]
+  
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+// Modelo principal de Cartas TCG
+model Card {
+  id               String  @id @default(cuid())
+  name             String
+  supertype        String  // Pokémon, Trainer, Energy
+  subtypes         String? // Stage 1, Stage 2, Basic, etc.
+  hp               String?
+  types            String? // JSON array: ["Fire", "Water"]
+  evolvesFrom      String?
+  
+  // Ataques (JSON)
+  attacks          String? // JSON de ataques
+  
+  // Debilidades y resistencias (JSON)
+  weaknesses       String? // JSON
+  resistances      String? // JSON
+  
+  // Costo de retirada
+  retreatCost      String? // JSON array
+  convertedRetreatCost Int?
+  
+  // Información del set
+  setId            String?
+  setName          String?
+  setSeries        String?
+  setTotal         Int?
+  setReleaseDate   String?
+  
+  // Información de la carta
+  number           String?
+  artist           String?
+  rarity           String?
+  
+  // Imágenes
+  imageSmall       String?
+  imageLarge       String?
+  
+  // Precios (JSON)
+  prices           String? // JSON de precios
+  
+  // Reglas especiales (JSON)
+  rules            String? // JSON array
+  
+  // Metadatos
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  createdById      Int
+  createdBy        User     @relation("CardCreator", fields: [createdById], references: [id])
+  
+  // Relaciones
+  deckCards        DeckCard[]
+  
+  @@map("cards")
+}
+
+// Modelo de Mazos
+model Deck {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  cards       DeckCard[]
+  
+  @@map("decks")
+}
+
+// Tabla intermedia para mazos y cartas (muchos a muchos con cantidad)
+model DeckCard {
+  id       Int @id @default(autoincrement())
+  quantity Int @default(1)
+  
+  // Relaciones
+  deckId   Int
+  deck     Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  
+  cardId   String
+  card     Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  
+  userId   Int
+  user     User @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([deckId, cardId])
+  @@map("deck_cards")
+}
+
+// Modelo para Sets de cartas
+model CardSet {
+  id           String   @id
+  name         String
+  series       String
+  printedTotal Int?
+  total        Int?
+  releaseDate  String?
+  
+  // Imágenes del set
+  symbolImage  String?
+  logoImage    String?
+  
+  // Metadatos
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@map("card_sets")
+}
