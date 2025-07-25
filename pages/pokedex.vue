@@ -101,12 +101,14 @@
             <input
               v-model="searchTerm"
               @keyup.enter="searchPokemon"
-              placeholder="Buscar Pokémon (ej: pikachu)"
+              @input="validateSearchInput"
+              placeholder="Buscar Pokémon (ej: pikachu, charizard, 25)"
               class="px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
             <button
               @click="searchPokemon"
-              class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              :disabled="!searchTerm.trim()"
+              class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               🔍 Buscar
             </button>
@@ -165,13 +167,6 @@
             <!-- Controles del caché -->
             <div class="flex gap-2">
               <button 
-                @click="preloadPopularPokemon"
-                :disabled="loading"
-                class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50"
-              >
-                🚀 Precargar Populares
-              </button>
-              <button 
                 @click="clearAllCache"
                 class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
               >
@@ -225,7 +220,7 @@
             <div class="relative inline-block">
               <img
                 :src="pokemon.sprites.other['official-artwork'].front_default"
-                :alt="pokemon.name"
+                :alt="getPokemonNameInSpanish(pokemon)"
                 class="w-64 h-64 mx-auto mb-4 drop-shadow-2xl"
                 @error="handleImageError"
               />
@@ -237,7 +232,7 @@
             </div>
 
             <h2 class="text-4xl font-bold capitalize text-white mb-2">
-              {{ pokemon.name }}
+              {{ getPokemonNameInSpanish(pokemon) }}
             </h2>
 
             <!-- Tipos -->
@@ -352,7 +347,7 @@
                   </div>
                   
                   <!-- Mostrar tipo si está disponible -->
-                  <div v-if="featuredMovesDetails[move.move.name]" class="flex gap-1">
+                  <div v-if="featuredMovesDetails[move.move.name]" class="flex gap-1 flex-wrap">
                     <span 
                       :class="getTypeColor(featuredMovesDetails[move.move.name].type)"
                       class="px-1 py-0.5 rounded text-xs font-bold"
@@ -364,6 +359,18 @@
                       class="bg-red-500 text-white px-1 py-0.5 rounded text-xs font-bold"
                     >
                       ⚡{{ featuredMovesDetails[move.move.name].power }}
+                    </span>
+                    <span 
+                      v-if="featuredMovesDetails[move.move.name].level_learned_at"
+                      class="bg-green-500 text-white px-1 py-0.5 rounded text-xs font-bold"
+                    >
+                      Nv.{{ featuredMovesDetails[move.move.name].level_learned_at }}
+                    </span>
+                    <span 
+                      v-else-if="featuredMovesDetails[move.move.name].learn_method !== 'level-up'"
+                      class="bg-purple-500 text-white px-1 py-0.5 rounded text-xs font-bold"
+                    >
+                      {{ getLearnMethodInSpanish(featuredMovesDetails[move.move.name].learn_method) }}
                     </span>
                   </div>
                   
@@ -392,11 +399,72 @@
         </div>
 
         <!-- Lista completa de movimientos (expandible) - Fuera del grid para ocupar todo el ancho -->
-        <div v-if="showAllMoves" class="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-6 max-h-96 overflow-y-auto">
+        <div v-if="showAllMoves" class="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-6">
           <h4 class="text-xl font-semibold text-white mb-4 text-center">
             🥊 Todos los Movimientos
             <div class="text-sm text-yellow-300 font-normal mt-1">(Haz clic en cualquier movimiento para ver su descripción)</div>
           </h4>
+          
+          <!-- Controles de filtrado y ordenamiento -->
+          <div class="mb-4 bg-white/10 rounded-lg p-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- Filtrar por tipo de daño -->
+              <div>
+                <label class="block text-sm font-medium text-white/80 mb-2">Filtrar por Categoría:</label>
+                <select 
+                  v-model="movesFilterBy"
+                  class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                >
+                  <option value="all" class="bg-gray-800">Todos</option>
+                  <option value="physical" class="bg-gray-800">Físico</option>
+                  <option value="special" class="bg-gray-800">Especial</option>
+                  <option value="status" class="bg-gray-800">Estado</option>
+                </select>
+              </div>
+              
+              <!-- Ordenar por -->
+              <div>
+                <label class="block text-sm font-medium text-white/80 mb-2">Ordenar por:</label>
+                <select 
+                  v-model="movesSortBy"
+                  class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                >
+                  <option value="level" class="bg-gray-800">Nivel de Aprendizaje</option>
+                  <option value="name" class="bg-gray-800">Nombre</option>
+                  <option value="type" class="bg-gray-800">Tipo</option>
+                  <option value="damage_class" class="bg-gray-800">Categoría de Daño</option>
+                  <option value="power" class="bg-gray-800">Poder</option>
+                </select>
+              </div>
+              
+              <!-- Orden ascendente/descendente -->
+              <div>
+                <label class="block text-sm font-medium text-white/80 mb-2">Orden:</label>
+                <button
+                  @click="movesOrderAsc = !movesOrderAsc"
+                  class="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg text-white hover:bg-white/30 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>{{ movesOrderAsc ? '⬆️ Ascendente' : '⬇️ Descendente' }}</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Estadísticas de filtrado -->
+            <div class="mt-3 flex flex-wrap gap-2 justify-center">
+              <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded text-xs">
+                📊 {{ filteredAndSortedMoves.length }} de {{ pokemon?.moves.length || 0 }} movimientos
+              </span>
+              <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded text-xs">
+                🇪🇸 Solo en español
+              </span>
+              <span v-if="movesFilterBy !== 'all'" class="bg-orange-500/20 text-orange-300 px-2 py-1 rounded text-xs">
+                🎯 Filtrado por {{ movesFilterBy === 'physical' ? 'Físico' : movesFilterBy === 'special' ? 'Especial' : 'Estado' }}
+              </span>
+              <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded text-xs">
+                📈 Ordenado por {{ movesSortBy === 'level' ? 'Nivel' : movesSortBy === 'name' ? 'Nombre' : movesSortBy === 'type' ? 'Tipo' : movesSortBy === 'damage_class' ? 'Categoría' : 'Poder' }}
+              </span>
+            </div>
+          </div>
           
           <!-- Indicador de carga -->
           <div v-if="loadingMoves" class="text-center py-8">
@@ -404,9 +472,9 @@
             <p class="text-white/70">Cargando tipos de movimientos...</p>
           </div>
           
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
             <div 
-              v-for="(move, index) in pokemon.moves" 
+              v-for="(move, index) in filteredAndSortedMoves" 
               :key="move.move.name"
               @click="showMoveDetails(move.move.name)"
               class="bg-white/20 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-sm font-medium cursor-pointer hover:bg-white/30 transition-colors"
@@ -417,18 +485,48 @@
               </div>
               
               <!-- Detalles del movimiento -->
-              <div v-if="movesDetails[move.move.name]" class="flex flex-wrap gap-1 mt-2">
+              <div v-if="move.details" class="flex flex-wrap gap-1 mt-2">
                 <span 
-                  :class="getTypeColor(movesDetails[move.move.name].type)"
+                  :class="getTypeColor(move.details.type)"
                   class="px-2 py-1 rounded text-xs font-bold"
                 >
-                  {{ getTypeInSpanish(movesDetails[move.move.name].type) }}
+                  {{ getTypeInSpanish(move.details.type) }}
                 </span>
+                
+                <!-- Categoría de daño -->
                 <span 
-                  v-if="movesDetails[move.move.name].power !== '-'"
+                  :class="{
+                    'bg-red-600': move.details.damage_class === 'physical',
+                    'bg-blue-600': move.details.damage_class === 'special',
+                    'bg-gray-600': move.details.damage_class === 'status'
+                  }"
+                  class="text-white px-2 py-1 rounded text-xs font-bold"
+                >
+                  {{ move.details.damage_class === 'physical' ? 'Fís' : move.details.damage_class === 'special' ? 'Esp' : 'Est' }}
+                </span>
+                
+                <!-- Poder -->
+                <span 
+                  v-if="move.details.power !== '-'"
                   class="bg-red-500 text-white px-2 py-1 rounded text-xs font-bold"
                 >
-                  ⚡{{ movesDetails[move.move.name].power }}
+                  ⚡{{ move.details.power }}
+                </span>
+                
+                <!-- Nivel de aprendizaje -->
+                <span 
+                  v-if="move.level_learned_at"
+                  class="bg-green-500 text-white px-2 py-1 rounded text-xs font-bold"
+                >
+                  Nv.{{ move.level_learned_at }}
+                </span>
+                
+                <!-- Método de aprendizaje (si no es por nivel) -->
+                <span 
+                  v-else
+                  class="bg-purple-500 text-white px-2 py-1 rounded text-xs font-bold"
+                >
+                  {{ getLearnMethodInSpanish(move.learn_method) }}
                 </span>
               </div>
               
@@ -443,7 +541,7 @@
           
           <div class="mt-4 text-center">
             <p class="text-white/70 text-sm">
-              Mostrando TODOS los {{ pokemon.moves.length }} movimientos de {{ pokemon.name }}
+              Mostrando {{ filteredAndSortedMoves.length }} de {{ pokemon?.moves.length || 0 }} movimientos de {{ getPokemonNameInSpanish(pokemon) }}
             </p>
             <div class="mt-2 flex justify-center gap-2 flex-wrap">
               <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded text-xs">
@@ -453,7 +551,7 @@
                 🧠 Sistema de caché inteligente
               </span>
               <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded text-xs">
-                🎯 TODOS los movimientos mostrados
+                🎯 Filtrado y ordenamiento avanzado
               </span>
             </div>
           </div>
@@ -477,11 +575,11 @@
           >
             <img
               :src="recent.sprites.front_default"
-              :alt="recent.name"
+              :alt="getPokemonNameInSpanish(recent)"
               class="w-16 h-16 mx-auto mb-2"
             />
             <div class="text-sm font-medium capitalize text-white">
-              {{ recent.name }}
+              {{ getPokemonNameInSpanish(recent) }}
             </div>
             <div class="text-xs text-white/70">#{{ recent.id }}</div>
           </div>
@@ -529,6 +627,19 @@
                 <div class="text-sm text-white/70 mb-1">Categoría</div>
                 <span class="text-white font-semibold">
                   {{ selectedMove.damage_class_spanish || 'Desconocido' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Método de aprendizaje -->
+            <div v-if="selectedMove.level_learned_at || selectedMove.learn_method" class="bg-green-500/20 rounded-lg p-3">
+              <div class="text-sm text-green-300 font-semibold mb-1">Método de Aprendizaje:</div>
+              <div class="text-white">
+                <span v-if="selectedMove.level_learned_at" class="bg-green-600 text-white px-2 py-1 rounded text-sm font-bold mr-2">
+                  📈 Nivel {{ selectedMove.level_learned_at }}
+                </span>
+                <span v-else-if="selectedMove.learn_method" class="bg-purple-600 text-white px-2 py-1 rounded text-sm font-bold">
+                  🎓 {{ getLearnMethodInSpanish(selectedMove.learn_method) }}
                 </span>
               </div>
             </div>
@@ -662,6 +773,11 @@ const movesDetails = ref({});
 const loadingMoves = ref(false);
 const featuredMovesDetails = ref({});
 
+// Filtros y ordenamiento de movimientos
+const movesSortBy = ref('level'); // level, name, type, damage_class, power
+const movesFilterBy = ref('all'); // all, physical, special, status
+const movesOrderAsc = ref(true);
+
 // Modal de descripción de movimientos
 const selectedMove = ref(null);
 const showMoveModal = ref(false);
@@ -780,11 +896,21 @@ async function loadPokemon(id) {
       pokemon.value = pokemonCache.value[cacheKey];
       currentId.value = pokemon.value.id;
       
+      // Si no tiene nombre en español en caché, cargarlo
+      if (!pokemon.value.spanishName) {
+        await loadPokemonNameInSpanish(pokemon.value);
+        // Actualizar caché con el nombre en español
+        pokemonCache.value[cacheKey] = pokemon.value;
+      }
+      
       // Actualizar recientes
-      updateRecentPokemon(pokemon.value);
+      await updateRecentPokemon(pokemon.value);
       
       // Cargar movimientos destacados desde caché también
       featuredMovesDetails.value = await loadFeaturedMovesDetails();
+      
+      // Cargar automáticamente los nombres de las habilidades en español
+      await loadAbilitiesDetails();
       loading.value = false;
       return;
     }
@@ -798,6 +924,9 @@ async function loadPokemon(id) {
 
     const data = await response.json();
     
+    // Cargar nombre en español
+    await loadPokemonNameInSpanish(data);
+    
     // Guardar en caché
     pokemonCache.value[cacheKey] = data;
     console.log(`💾 Pokémon #${id} guardado en caché`);
@@ -806,10 +935,13 @@ async function loadPokemon(id) {
     currentId.value = data.id;
 
     // Actualizar recientes
-    updateRecentPokemon(data);
+    await updateRecentPokemon(data);
     
     // Cargar automáticamente los tipos de los movimientos destacados
     featuredMovesDetails.value = await loadFeaturedMovesDetails();
+    
+    // Cargar automáticamente los nombres de las habilidades en español
+    await loadAbilitiesDetails();
   } catch (err) {
     error.value = err.message;
     console.error("Error cargando Pokémon:", err);
@@ -819,7 +951,12 @@ async function loadPokemon(id) {
 }
 
 // Función auxiliar para actualizar lista de Pokémon recientes
-function updateRecentPokemon(pokemonData) {
+async function updateRecentPokemon(pokemonData) {
+  // Cargar nombre en español si no lo tiene
+  if (!pokemonData.spanishName) {
+    await loadPokemonNameInSpanish(pokemonData);
+  }
+  
   const existing = recentPokemon.value.findIndex((p) => p.id === pokemonData.id);
   if (existing === -1) {
     recentPokemon.value.unshift(pokemonData);
@@ -833,12 +970,61 @@ function updateRecentPokemon(pokemonData) {
   }
 }
 
-// Buscar por nombre
+
+
+
+// Función para validar input en tiempo real
+function validateSearchInput(event) {
+  const inputValue = event.target.value;
+  
+  // Filtrar caracteres no válidos (solo letras, números, espacios y guiones)
+  const cleanValue = inputValue.replace(/[^a-zA-Z0-9\s\-'\.]/g, '');
+  
+  // Si el valor cambió, actualizar el input
+  if (cleanValue !== inputValue) {
+    searchTerm.value = cleanValue;
+    error.value = "Se eliminaron caracteres especiales no permitidos";
+    
+    // Limpiar el mensaje de error después de 3 segundos
+    setTimeout(() => {
+      if (error.value === "Se eliminaron caracteres especiales no permitidos") {
+        error.value = "";
+      }
+    }, 3000);
+  } else {
+    // Limpiar error si el texto es válido
+    if (error.value === "Se eliminaron caracteres especiales no permitidos" || 
+        error.value === "Solo se permiten letras, números y espacios en la búsqueda") {
+      error.value = "";
+    }
+  }
+}
+
+// Función para validar texto de búsqueda
+function isValidSearchText(text) {
+  // Permitir letras, números, espacios, guiones, puntos y apostrofes
+  const validPattern = /^[a-zA-Z0-9\s\-'\.]+$/;
+  return validPattern.test(text);
+}
+
+// Buscar por nombre (simple con búsqueda parcial)
 async function searchPokemon() {
   if (!searchTerm.value.trim()) return;
 
   const term = searchTerm.value.toLowerCase().trim();
-  await loadPokemon(term);
+  
+  // Validar que solo contenga caracteres válidos
+  if (!isValidSearchText(term)) {
+    error.value = "Solo se permiten letras, números, espacios y guiones en la búsqueda";
+    return;
+  }
+  
+  try {
+    await loadPokemon(term);
+    // No limpiar el término de búsqueda para permitir búsquedas similares
+  } catch (err) {
+    error.value = `Pokémon "${term}" no encontrado`;
+  }
 }
 
 // Pokémon aleatorio
@@ -888,19 +1074,34 @@ async function loadFeaturedMovesDetails() {
       if (response.ok) {
         const moveData = await response.json();
         
-        // Buscar nombre en español
+        // Buscar nombre en español SOLAMENTE
         const spanishName = moveData.names.find(name => 
           name.language.name === 'es'
-        )?.name || moveData.names.find(name => 
-          name.language.name === 'en'
-        )?.name || moveData.name;
+        )?.name;
+        
+        // Si no hay nombre en español, saltar este movimiento
+        if (!spanishName) {
+          console.warn(`Movimiento ${move.move.name} no tiene nombre en español, omitiendo`);
+          return null;
+        }
+        
+        // Obtener información del nivel de aprendizaje
+        const moveEntry = move.version_group_details.find(entry => 
+          entry.move_learn_method.name === 'level-up'
+        );
+        const learnLevel = moveEntry ? moveEntry.level_learned_at : null;
+        const learnMethod = move.version_group_details[0]?.move_learn_method.name || 'unknown';
         
         const moveInfo = {
           type: moveData.type?.name || 'normal',
           power: moveData.power || '-',
           accuracy: moveData.accuracy || '-',
           pp: moveData.pp || '-',
-          spanishName: spanishName
+          spanishName: spanishName,
+          damage_class: moveData.damage_class?.name || 'status',
+          level_learned_at: learnLevel,
+          learn_method: learnMethod,
+          priority: moveData.priority || 0
         };
         
         // Guardar en caché
@@ -914,7 +1115,11 @@ async function loadFeaturedMovesDetails() {
         power: '-',
         accuracy: '-',
         pp: '-',
-        spanishName: move.move.name.replace(/-/g, ' ')
+        spanishName: 'Nombre no disponible en español',
+        damage_class: 'status',
+        level_learned_at: null,
+        learn_method: 'unknown',
+        priority: 0
       };
       movesCache.value[move.move.name] = fallbackInfo;
       return { name: move.move.name, data: fallbackInfo };
@@ -923,12 +1128,77 @@ async function loadFeaturedMovesDetails() {
   
   const results = await Promise.all(movePromises);
   results.forEach(result => {
-    if (result) {
+    if (result && result.data) {
       details[result.name] = result.data;
     }
   });
   
   return details;
+}
+
+// Cargar nombres de habilidades en español
+async function loadAbilitiesDetails() {
+  if (!pokemon.value) return;
+  
+  const abilities = pokemon.value.abilities;
+  
+  // Verificar si ya tenemos todas las habilidades en caché
+  const missingAbilities = abilities.filter(ability => 
+    !abilitiesCache.value[ability.ability.name]?.spanishName
+  );
+  
+  if (missingAbilities.length === 0) {
+    console.log(`🎯 Todas las habilidades ya están en caché`);
+    return;
+  }
+  
+  console.log(`🌐 Cargando ${missingAbilities.length} nombres de habilidades en español...`);
+  
+  // Cargar nombres de habilidades en paralelo
+  const abilityPromises = missingAbilities.map(async (ability) => {
+    try {
+      const response = await fetch(`https://pokeapi.co/api/v2/ability/${ability.ability.name}`);
+      if (response.ok) {
+        const abilityData = await response.json();
+        
+        // Buscar nombre en español SOLAMENTE
+        const spanishName = abilityData.names.find(name => 
+          name.language.name === 'es'
+        )?.name;
+        
+        // Si no hay nombre en español, usar fallback
+        if (!spanishName) {
+          console.warn(`Habilidad ${ability.ability.name} no tiene nombre en español`);
+          const fallbackInfo = {
+            spanishName: 'Nombre no disponible en español',
+            is_hidden: ability.is_hidden || false
+          };
+          abilitiesCache.value[ability.ability.name] = fallbackInfo;
+          return { name: ability.ability.name, data: fallbackInfo };
+        }
+        
+        const abilityInfo = {
+          spanishName: spanishName,
+          is_hidden: ability.is_hidden || false
+        };
+        
+        // Guardar en caché (solo nombre por ahora, descripción se carga al hacer clic)
+        abilitiesCache.value[ability.ability.name] = abilityInfo;
+        return { name: ability.ability.name, data: abilityInfo };
+      }
+    } catch (err) {
+      console.error(`Error cargando ${ability.ability.name}:`, err);
+      const fallbackInfo = {
+        spanishName: 'Nombre no disponible en español',
+        is_hidden: ability.is_hidden || false
+      };
+      abilitiesCache.value[ability.ability.name] = fallbackInfo;
+      return { name: ability.ability.name, data: fallbackInfo };
+    }
+  });
+  
+  await Promise.all(abilityPromises);
+  console.log(`✅ Nombres de habilidades cargados en español`);
 }
 
 // Cargar detalles de movimientos de forma optimizada - TODOS los movimientos
@@ -941,7 +1211,7 @@ async function loadMovesDetails() {
   try {
     // Cargar TODOS los movimientos del Pokémon
     const movesToLoad = pokemon.value.moves;
-    console.log(`🎯 Cargando ${movesToLoad.length} movimientos de ${pokemon.value.name}`);
+    console.log(`🎯 Cargando ${movesToLoad.length} movimientos de ${getPokemonNameInSpanish(pokemon.value)}`);
     
     // Separar movimientos que ya están en caché vs nuevos
     const newMoves = [];
@@ -973,19 +1243,34 @@ async function loadMovesDetails() {
         if (response.ok) {
           const moveData = await response.json();
           
-          // Buscar nombre en español
+          // Buscar nombre en español SOLAMENTE
           const spanishName = moveData.names.find(name => 
             name.language.name === 'es'
-          )?.name || moveData.names.find(name => 
-            name.language.name === 'en'
-          )?.name || moveData.name;
+          )?.name;
+          
+          // Si no hay nombre en español, saltar este movimiento
+          if (!spanishName) {
+            console.warn(`Movimiento ${move.move.name} no tiene nombre en español, omitiendo`);
+            return null;
+          }
+          
+          // Obtener información del nivel de aprendizaje
+          const moveEntry = move.version_group_details.find(entry => 
+            entry.move_learn_method.name === 'level-up'
+          );
+          const learnLevel = moveEntry ? moveEntry.level_learned_at : null;
+          const learnMethod = move.version_group_details[0]?.move_learn_method.name || 'unknown';
           
           const moveInfo = {
             type: moveData.type?.name || 'normal',
             power: moveData.power || '-',
             accuracy: moveData.accuracy || '-',
             pp: moveData.pp || '-',
-            spanishName: spanishName // Agregar nombre en español
+            spanishName: spanishName,
+            damage_class: moveData.damage_class?.name || 'status',
+            level_learned_at: learnLevel,
+            learn_method: learnMethod,
+            priority: moveData.priority || 0
           };
           
           // Guardar en caché
@@ -994,13 +1279,16 @@ async function loadMovesDetails() {
         }
       } catch (err) {
         console.error(`Error cargando ${move.move.name}:`, err);
-        // Fallback con valores por defecto
         const fallbackInfo = {
           type: 'normal',
           power: '-',
           accuracy: '-',
           pp: '-',
-          spanishName: move.move.name.replace(/-/g, ' ')
+          spanishName: 'Nombre no disponible en español',
+          damage_class: 'status',
+          level_learned_at: null,
+          learn_method: 'unknown',
+          priority: 0
         };
         movesCache.value[move.move.name] = fallbackInfo;
         return { name: move.move.name, data: fallbackInfo };
@@ -1013,13 +1301,19 @@ async function loadMovesDetails() {
     
     // Agregar resultados nuevos
     results.forEach(result => {
-      if (result) {
+      if (result && result.data) {
         details[result.name] = result.data;
       }
     });
     
     movesDetails.value = details;
-    console.log(`✅ ¡Cargados TODOS los ${Object.keys(details).length} movimientos! (${newMoves.length} nuevos, ${cachedMoves.length} de caché)`);
+    console.log(`✅ ¡Cargados ${Object.keys(details).length} movimientos en español! (${newMoves.length} nuevos, ${cachedMoves.length} de caché)`);
+    
+    const totalMoves = pokemon.value.moves.length;
+    const spanishMoves = Object.keys(details).length + cachedMoves.length;
+    if (spanishMoves < totalMoves) {
+      console.log(`ℹ️ Se omitieron ${totalMoves - spanishMoves} movimientos sin traducción al español`);
+    }
     
   } catch (error) {
     console.error('Error cargando detalles de movimientos:', error);
@@ -1042,11 +1336,18 @@ async function showMoveDetails(moveName) {
       return;
     }
     
-    // Buscar el movimiento en la lista del Pokémon para obtener la URL
+    // Buscar el movimiento en la lista del Pokémon para obtener la URL y nivel
     const moveData = pokemon.value.moves.find(m => m.move.name === moveName);
     if (!moveData) {
       throw new Error('Movimiento no encontrado');
     }
+    
+    // Obtener información del nivel de aprendizaje
+    const moveEntry = moveData.version_group_details.find(entry => 
+      entry.move_learn_method.name === 'level-up'
+    );
+    const learnLevel = moveEntry ? moveEntry.level_learned_at : null;
+    const learnMethod = moveData.version_group_details[0]?.move_learn_method.name || 'unknown';
     
     // Cargar detalles completos del movimiento
     const response = await fetch(moveData.move.url);
@@ -1056,30 +1357,29 @@ async function showMoveDetails(moveName) {
     
     const fullMoveData = await response.json();
     
-    // Buscar nombre en español
+    // Buscar nombre en español SOLAMENTE
     const spanishName = fullMoveData.names.find(name => 
       name.language.name === 'es'
-    )?.name || fullMoveData.names.find(name => 
-      name.language.name === 'en'
-    )?.name || fullMoveData.name;
+    )?.name;
     
-    // Buscar descripción en español primero, luego inglés
+    // Si no hay nombre en español, mostrar error
+    if (!spanishName) {
+      throw new Error('Este movimiento no tiene traducción al español disponible');
+    }
+    
+    // Buscar descripción SOLO en español
     const description = fullMoveData.effect_entries.find(entry => 
       entry.language.name === 'es'
-    )?.effect || fullMoveData.effect_entries.find(entry => 
-      entry.language.name === 'en'
-    )?.effect || 'Descripción no disponible';
+    )?.effect || '';
     
-    // Buscar descripción corta en español para efectos más claros
+    // Buscar descripción corta SOLO en español
     const shortDescription = fullMoveData.flavor_text_entries.find(entry => 
       entry.language.name === 'es'
-    )?.flavor_text || fullMoveData.flavor_text_entries.find(entry => 
-      entry.language.name === 'en'
     )?.flavor_text || '';
     
-    // Si tenemos descripción corta en español, usarla; si no, usar la descripción larga
+    // Si no hay descripción en español, usar un mensaje por defecto
     const finalDescription = shortDescription && shortDescription.trim() !== '' ? 
-      shortDescription : description;
+      shortDescription : (description || 'Descripción en español no disponible');
     
     // Traducir categoría de daño
     const damageClassTranslations = {
@@ -1101,7 +1401,9 @@ async function showMoveDetails(moveName) {
       damage_class_spanish: damageClassTranslations[fullMoveData.damage_class?.name] || 'Desconocido',
       description: finalDescription.replace(/\$effect_chance/g, fullMoveData.effect_chance || '').replace(/\n/g, ' ').replace(/\s+/g, ' ').trim(),
       shortDescription: shortDescription,
-      effect_chance: fullMoveData.effect_chance || null
+      effect_chance: fullMoveData.effect_chance || null,
+      level_learned_at: learnLevel,
+      learn_method: learnMethod
     };
     
     // Actualizar caché con información completa
@@ -1119,12 +1421,12 @@ async function showMoveDetails(moveName) {
     console.error('Error cargando detalles del movimiento:', error);
     selectedMove.value = {
       name: moveName,
-      spanishName: moveName,
+      spanishName: 'Nombre no disponible en español',
       type: 'normal',
       power: '-',
       accuracy: '-',
       pp: '-',
-      description: 'Error al cargar la descripción del movimiento.',
+      description: 'Este movimiento no tiene traducción al español disponible.',
       damage_class: 'unknown',
       damage_class_spanish: 'Desconocido'
     };
@@ -1164,19 +1466,21 @@ async function showAbilityDetails(abilityName) {
     
     const fullAbilityData = await response.json();
     
-    // Buscar nombre en español
-    const spanishName = fullAbilityData.names.find(name => 
-      name.language.name === 'es'
-    )?.name || fullAbilityData.names.find(name => 
-      name.language.name === 'en'
-    )?.name || fullAbilityData.name;
+    // Buscar nombre en español SOLAMENTE (usar del caché si ya lo tenemos)
+    let spanishName = abilitiesCache.value[abilityName]?.spanishName || 
+                     fullAbilityData.names.find(name => 
+                       name.language.name === 'es'
+                     )?.name;
     
-    // Buscar descripción en español
+    // Si no hay nombre en español, mostrar error
+    if (!spanishName) {
+      throw new Error('Esta habilidad no tiene traducción al español disponible');
+    }
+    
+    // Buscar descripción SOLO en español
     const description = fullAbilityData.flavor_text_entries.find(entry => 
       entry.language.name === 'es'
-    )?.flavor_text || fullAbilityData.flavor_text_entries.find(entry => 
-      entry.language.name === 'en'
-    )?.flavor_text || 'Descripción no disponible';
+    )?.flavor_text || 'Descripción en español no disponible';
     
     // Buscar efecto detallado SOLO en español
     const spanishEffect = fullAbilityData.effect_entries.find(entry => 
@@ -1232,6 +1536,91 @@ async function toggleAllMoves() {
   }
 }
 
+// Función computada para filtrar y ordenar movimientos
+const filteredAndSortedMoves = computed(() => {
+  if (!pokemon.value || !showAllMoves.value) return [];
+  
+  let moves = pokemon.value.moves.map(move => {
+    const details = movesDetails.value[move.move.name];
+    const moveEntry = move.version_group_details.find(entry => 
+      entry.move_learn_method.name === 'level-up'
+    );
+    const learnLevel = moveEntry ? moveEntry.level_learned_at : null;
+    const learnMethod = move.version_group_details[0]?.move_learn_method.name || 'unknown';
+    
+    return {
+      ...move,
+      details,
+      level_learned_at: learnLevel,
+      learn_method: learnMethod
+    };
+  }).filter(move => {
+    // Solo mostrar movimientos que tienen datos en español
+    return move.details && move.details.spanishName && move.details.spanishName !== 'Nombre no disponible en español';
+  });
+  
+  // Filtrar por tipo de daño
+  if (movesFilterBy.value !== 'all') {
+    moves = moves.filter(move => {
+      if (!move.details) return false;
+      return move.details.damage_class === movesFilterBy.value;
+    });
+  }
+  
+  // Ordenar
+  moves.sort((a, b) => {
+    let valueA, valueB;
+    
+    switch (movesSortBy.value) {
+      case 'level':
+        valueA = a.level_learned_at || 999; // Los que no se aprenden por nivel al final
+        valueB = b.level_learned_at || 999;
+        break;
+      case 'name':
+        valueA = getMoveNameInSpanish(a.move.name).toLowerCase();
+        valueB = getMoveNameInSpanish(b.move.name).toLowerCase();
+        break;
+      case 'type':
+        valueA = getTypeInSpanish(a.details?.type || 'normal').toLowerCase();
+        valueB = getTypeInSpanish(b.details?.type || 'normal').toLowerCase();
+        break;
+      case 'damage_class':
+        valueA = a.details?.damage_class || 'status';
+        valueB = b.details?.damage_class || 'status';
+        break;
+      case 'power':
+        valueA = a.details?.power === '-' ? 0 : parseInt(a.details?.power || 0);
+        valueB = b.details?.power === '-' ? 0 : parseInt(b.details?.power || 0);
+        break;
+      default:
+        return 0;
+    }
+    
+    if (valueA < valueB) return movesOrderAsc.value ? -1 : 1;
+    if (valueA > valueB) return movesOrderAsc.value ? 1 : -1;
+    return 0;
+  });
+  
+  return moves;
+});
+
+// Función para obtener método de aprendizaje en español
+function getLearnMethodInSpanish(method) {
+  const methodTranslations = {
+    'level-up': 'Por Nivel',
+    'machine': 'MT/MO',
+    'egg': 'Por Huevo',
+    'tutor': 'Tutor',
+    'light-ball-egg': 'Huevo Especial',
+    'colosseum-purification': 'Purificación',
+    'xd-shadow': 'Sombra XD',
+    'xd-purification': 'Purificación XD',
+    'form-change': 'Cambio de Forma'
+  };
+  
+  return methodTranslations[method] || method;
+}
+
 // Función para obtener estadísticas del caché
 function getCacheStats() {
   return {
@@ -1253,33 +1642,6 @@ function clearAllCache() {
   }
   
   console.log('🧹 Todo el caché ha sido limpiado');
-}
-
-// Función para precargar Pokémon populares
-async function preloadPopularPokemon() {
-  const popularIds = [1, 25, 6, 9, 3, 150, 151, 249, 250, 383, 384, 483, 484, 487, 644, 645, 646, 716, 717, 718];
-  console.log(`🚀 Precargando ${popularIds.length} Pokémon populares...`);
-  
-  loading.value = true;
-  let loaded = 0;
-  
-  for (const id of popularIds) {
-    if (!pokemonCache.value[id.toString()]) {
-      try {
-        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          pokemonCache.value[id.toString()] = data;
-          loaded++;
-        }
-      } catch (error) {
-        console.warn(`Error precargando Pokémon #${id}:`, error);
-      }
-    }
-  }
-  
-  loading.value = false;
-  console.log(`✅ Precargados ${loaded} Pokémon nuevos`);
 }
 
 // Colores para tipos
@@ -1339,14 +1701,64 @@ function getMoveNameInSpanish(moveName) {
     return movesCache.value[moveName].spanishName;
   }
   
-  // Mientras tanto, mostrar una versión formateada del nombre en inglés
-  return moveName.replace(/-/g, ' ').split(' ').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ');
+  // Si no hay nombre en español, mostrar un mensaje claro
+  return 'Nombre no disponible en español';
+}
+
+// Función para obtener nombres de Pokémon en español
+function getPokemonNameInSpanish(pokemon) {
+  // Si ya tenemos el nombre en español, usarlo
+  if (pokemon.spanishName) {
+    return pokemon.spanishName;
+  }
+  
+  // Fallback al nombre original mientras se carga
+  return pokemon.name;
+}
+
+// Función para cargar nombre de Pokémon en español
+async function loadPokemonNameInSpanish(pokemonData) {
+  try {
+    // Si ya tiene nombre en español, no hacer nada
+    if (pokemonData.spanishName) {
+      return pokemonData;
+    }
+    
+    // Cargar información de especies para obtener el nombre en español
+    const speciesResponse = await fetch(pokemonData.species.url);
+    if (speciesResponse.ok) {
+      const speciesData = await speciesResponse.json();
+      
+      // Buscar nombre en español
+      const spanishName = speciesData.names.find(name => 
+        name.language.name === 'es'
+      )?.name;
+      
+      // Si encontramos nombre en español, agregarlo al objeto
+      if (spanishName) {
+        pokemonData.spanishName = spanishName;
+        console.log(`✅ Nombre en español para ${pokemonData.name}: ${spanishName}`);
+      } else {
+        console.warn(`❌ No se encontró nombre en español para ${pokemonData.name}`);
+        pokemonData.spanishName = pokemonData.name; // Fallback
+      }
+    }
+  } catch (error) {
+    console.error(`Error cargando nombre en español para ${pokemonData.name}:`, error);
+    pokemonData.spanishName = pokemonData.name; // Fallback
+  }
+  
+  return pokemonData;
 }
 
 // Función para obtener nombres de habilidades en español
 function getAbilityNameInSpanish(abilityName) {
+  // Si ya tenemos el nombre en español en el caché, usarlo
+  if (abilitiesCache.value[abilityName]?.spanishName) {
+    return abilitiesCache.value[abilityName].spanishName;
+  }
+  
+  // Si no hay nombre en caché, usar traducciones manuales como fallback
   const abilityTranslations = {
     // Habilidades comunes
     'overgrow': 'Espesura',
@@ -1425,9 +1837,7 @@ function getAbilityNameInSpanish(abilityName) {
     'air-lock': 'Esfera Aérea'
   };
   
-  return abilityTranslations[abilityName] || abilityName.replace(/-/g, ' ').split(' ').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ');
+  return abilityTranslations[abilityName] || 'Nombre no disponible en español';
 }
 
 // Función para obtener nombres de estadísticas en español
