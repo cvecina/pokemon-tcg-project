@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-    <!-- Header -->
-    <!-- <Header /> -->
+  <div class="min-h-screen bg-gradient-to-br from-orange-900 via-red-900 to-pink-900">
+    <!-- Global Header -->
+    <GlobalHeader />
     
     <!-- Main Content -->
     <main class="min-h-screen">

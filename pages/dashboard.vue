@@ -1,67 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-orange-900 via-red-900 to-pink-900">
-    <!-- Header -->
-    <header class="relative z-10">
-      <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center py-6">
-          <NuxtLink to="/" class="text-3xl font-bold text-white flex items-center space-x-2">
-            <span>🃏</span>
-            <span>TCG Manager</span>
-          </NuxtLink>
-          
-          <!-- Navegación -->
-          <div class="hidden md:flex items-center space-x-6">
-            <NuxtLink 
-              to="/pokedex" 
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>📱</span>
-              <span>Pokédex</span>
-            </NuxtLink>
-            <NuxtLink 
-              to="/cards" 
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>🔍</span>
-              <span>Explorar Cartas</span>
-            </NuxtLink>
-            <NuxtLink 
-              to="/decks" 
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>🎲</span>
-              <span>Mis Mazos</span>
-            </NuxtLink>
-            <a 
-              href="https://discord.gg/aKxPPuEFnH" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>💬</span>
-              <span>Discord</span>
-            </a>
-          </div>          <!-- Usuario -->
-          <div class="flex items-center space-x-4">
-            <span class="text-sm text-white/80 hidden sm:block">
-              Hola, <span class="font-medium text-white">{{ authStore.user?.username }}</span>
-            </span>
-            <span class="bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold">
-              Dashboard
-            </span>
-            <button 
-              @click="handleLogout"
-              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Cerrar Sesión
-            </button>
-          </div>
-        </div>
-      </nav>
-    </header>
-
     <!-- Menú de tabs del dashboard -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
       <div class="bg-white/10 backdrop-blur-sm rounded-lg p-1 mb-8">
         <nav class="flex space-x-1">
           <button 

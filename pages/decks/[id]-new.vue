@@ -1,31 +1,5 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-    <!-- Header -->
-    <header class="relative z-10">
-      <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center py-6">
-          <div class="flex items-center space-x-4">
-            <button 
-              @click="$router.back()"
-              class="text-white hover:text-yellow-300 transition-colors"
-            >
-              ← Volver
-            </button>
-            <NuxtLink to="/" class="text-3xl font-bold text-white flex items-center space-x-2">
-              <span>🃏</span>
-              <span>TCG Manager</span>
-            </NuxtLink>
-          </div>
-          
-          <div v-if="authStore.isAuthenticated" class="flex items-center space-x-4">
-            <NuxtLink to="/dashboard" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors">
-              Dashboard
-            </NuxtLink>
-          </div>
-        </div>
-      </nav>
-    </header>
-
     <!-- Loading -->
     <div v-if="loading" class="flex justify-center py-20">
       <div class="loading loading-spinner loading-lg text-white"></div>
@@ -42,6 +16,17 @@
 
     <!-- Contenido del mazo -->
     <main v-else class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Botón volver -->
+      <div class="mb-6">
+        <button 
+          @click="$router.back()"
+          class="text-white hover:text-yellow-300 transition-colors flex items-center space-x-2"
+        >
+          <span>←</span>
+          <span>Volver</span>
+        </button>
+      </div>
+      
       <!-- Header del mazo -->
       <div class="bg-white/10 backdrop-blur-sm rounded-lg p-6 mb-8">
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">

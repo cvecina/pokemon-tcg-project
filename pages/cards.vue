@@ -2,83 +2,6 @@
   <div
     class="min-h-screen bg-gradient-to-br from-orange-900 via-red-900 to-pink-900"
   >
-    <!-- Header -->
-    <header class="relative z-10">
-      <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center py-6">
-          <NuxtLink
-            to="/"
-            class="text-3xl font-bold text-white flex items-center space-x-2"
-          >
-            <span>🃏</span>
-            <span>TCG Manager</span>
-          </NuxtLink>
-
-          <!-- Navegación -->
-          <div class="hidden md:flex items-center space-x-6">
-            <NuxtLink
-              to="/pokedex"
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>📱</span>
-              <span>Pokédex</span>
-            </NuxtLink>
-            <NuxtLink
-              to="/cards"
-              class="text-yellow-300 font-medium flex items-center space-x-1"
-            >
-              <span>🔍</span>
-              <span>Explorar Cartas</span>
-            </NuxtLink>
-            <NuxtLink
-              v-if="authStore.isAuthenticated"
-              to="/decks"
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>🎲</span>
-              <span>Mis Mazos</span>
-            </NuxtLink>
-            <a
-              href="https://discord.gg/aKxPPuEFnH"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-white hover:text-yellow-300 transition-colors font-medium flex items-center space-x-1"
-            >
-              <span>💬</span>
-              <span>Discord</span>
-            </a>
-          </div>
-
-          <!-- Usuario -->
-          <div
-            v-if="authStore.isAuthenticated"
-            class="flex items-center space-x-4"
-          >
-            <NuxtLink
-              to="/dashboard"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Dashboard
-            </NuxtLink>
-            <button
-              @click="authStore.logout()"
-              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Cerrar Sesión
-            </button>
-          </div>
-          <div v-else>
-            <NuxtLink
-              to="/auth"
-              class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-lg font-semibold transition-colors"
-            >
-              Iniciar Sesión
-            </NuxtLink>
-          </div>
-        </div>
-      </nav>
-    </header>
-
     <!-- Contenido Principal -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Header Section -->
@@ -933,6 +856,17 @@ watch([selectedRarity, selectedType], () => {
   searchCards();
 });
 
+// Cerrar menú móvil al hacer click fuera
+onMounted(async () => {
+  console.log("🚀 Componente montado - esperando búsqueda del usuario");
+  
+  // Configurar Intersection Observer para auto-carga
+  setupAutoLoad();
+  
+  // No cargar cartas automáticamente, solo mostrar mensaje inicial
+  // El usuario debe buscar algo para ver resultados
+});
+
 // Limpiar timeout al desmontar el componente
 onUnmounted(() => {
   if (searchTimeout.value) {
@@ -1447,5 +1381,26 @@ useHead({
 .manual-controls-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Menú móvil animaciones */
+.mobile-menu-enter-active,
+.mobile-menu-leave-active {
+  transition: all 0.3s ease;
+}
+
+.mobile-menu-enter-from,
+.mobile-menu-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* Botón hamburguesa animación */
+.hamburger-button {
+  transition: transform 0.2s ease;
+}
+
+.hamburger-button:active {
+  transform: scale(0.95);
 }
 </style>
